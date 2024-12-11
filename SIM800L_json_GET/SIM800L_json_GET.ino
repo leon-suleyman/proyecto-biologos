@@ -3,20 +3,13 @@
 //#include <SoftwareSerial.h>
 #include <Sim800L.h>
 
-// Your GPRS credentials
-const char apn[] = "igprs.claro.com.ar"; // Replace with your APN
-const char user[] = ""; // Leave empty if not needed
-const char pass[] = ""; // Leave empty if not needed
 
-// Server details
-const char server[] = "eu.httpbin.org";
-const int port = 80;
 
 // Pin definitions for your SIM800 module
-#define RX_PIN 7
-#define TX_PIN 8
+#define RX_PIN 10
+#define TX_PIN 11
 #define BAUD_RATE 9600
-#define SERIAL_DEBUG 0 // poner en 1 para controlar por terminal serial de arduino
+#define SERIAL_DEBUG 1 // poner en 1 para controlar por terminal serial de arduino
 
 
 #if SERIAL_DEBUG
@@ -72,11 +65,25 @@ bool serial_parse(void) {
   }
   //control serial del Arduino, 'h' para el Hello y 'q' para mandar Bye.
   if (command.length() == 1) {
-    if (command[0] >= '1' && command[0] <= '5') set_speed_junta(command[0] - '1', 1);
-    else if (command[0] == 'h') Sim800L.sendSms("+451156628833", "Hello World!");
-    else {
+    if (command[0] == 'h'){
+      Serial.println("mandando mensaje...");
+      bool error = Sim800L.sendSms("+541156628833", "Hello World!");
+      if (error) {
+        Serial.println("Error al enviar mensaje :C");
+      }else{
+        Serial.println("mensaje evniado!");
+      }
+    } else {
       switch(command[0]) {
-        case 'q': Sim800L.sendSms("+451156628833", "Bye World!"); break;
+        case 'q':
+          Serial.println("mandando mensaje...");
+          bool error = Sim800L.sendSms("+541156628833", "Bye World!");
+          if (error) {
+            Serial.println("Error al enviar mensaje :C");
+          }else{
+            Serial.println("mensaje evniado!");
+          }
+          break;
       }
     }
   }
