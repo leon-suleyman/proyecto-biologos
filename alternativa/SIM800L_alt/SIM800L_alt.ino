@@ -35,6 +35,7 @@ TinyGsmClient client(modem);
 bool error = false;
 String module_buffer;
 SoftwareSerial sw_serial(RX_PIN, TX_PIN);
+String _buffer;
 
 String _readSerial(){
   uint64_t timeOld = millis();
@@ -57,7 +58,7 @@ String _readSerial(){
   return str;
 }
 
-String _readSerial(uint_32 timeout){
+String _readSerial_timeout(int timeout){
   uint64_t timeOld = millis();
 
   while (!sw_serial.available() && !(millis() > timeOld + timeout))
@@ -78,18 +79,18 @@ String _readSerial(uint_32 timeout){
   return str;
 }
 
-void sendSms( String num, String msg){
-  sw_serial.print (F("AT+CMGF=1\r")); 	//set sms to text mode
+bool sendSms( String num, String msg){
+  sw_serial.println ("AT+CMGF=1"); 	//set sms to text mode
   _buffer=_readSerial();
-  sw_serial.print (F("AT+CMGS=\""));  	// command to send sms
-  sw_serial.print (number);
-  sw_serial.print(F("\"\r"));
+  sw_serial.println ("AT+CMGS=\"" + num + "\"");  	// command to send sms
+  //sw_serial.print (num);
+  //sw_serial.println("\"");
   _buffer=_readSerial();
-  sw_serial.print (text);
-  sw_serial.print ("\r");
+  sw_serial.print (msg);
+  //sw_serial.print ("\r");
   _buffer=_readSerial();
-  sw_serial.print((char)26);
-  _buffer=_readSerial(60000);
+  sw_serial.write(26);
+  _buffer=_readSerial_timeout(60000);
   // Serial.println(_buffer);
   //expect CMGS:xxx   , where xxx is a number,for the sending sms.
   if ((_buffer.indexOf("ER")) != -1) {
@@ -112,7 +113,6 @@ void setup() {
 
   pinMode(RESET_PIN, OUTPUT);
 
-  _baud = baud;
   sw_serial.begin(BAUD_RATE);
 
   if (LED_FLAG) pinMode(LED_PIN, OUTPUT);
