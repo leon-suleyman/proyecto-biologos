@@ -25,6 +25,7 @@ TinyGsmClient client(modem);
 */
 Sim800L Sim800L(RX_PIN, TX_PIN);
 bool error = false;
+char* num_tel = "+541168837372";
 
 //setup al prenderse el dispositivo
 void setup() {
@@ -34,7 +35,8 @@ void setup() {
   #endif
 
   Sim800L.begin(BAUD_RATE);
-  Sim800L.sendSms("+541156628833", "Hello World!");
+  delay(5000);
+  Sim800L.sendSms(num_tel, "Hello World!");
 }
 
 //funciones para testear y mandar comandos desde la computadora directamente al Arduino
@@ -69,7 +71,7 @@ bool serial_parse(void) {
   if (command.length() == 1) {
     if (command[0] == 'h'){
       Serial.println("mandando mensaje...");
-      error = Sim800L.sendSms("+541156628833", "Yo, World!");
+      error = Sim800L.sendSms(num_tel, "Yo, World!");
         if (error) {
           Serial.println("Error al enviar mensaje :C");
         }else{
@@ -79,7 +81,7 @@ bool serial_parse(void) {
       switch(command[0]) {
         case 'q':
           Serial.println("mandando mensaje...");
-          error = Sim800L.sendSms("+541156628833", "Hello World!");
+          error = Sim800L.sendSms(num_tel, "Hello World!");
           if (error) {
             Serial.println("Error al enviar mensaje :C");
           }else{
@@ -88,7 +90,16 @@ bool serial_parse(void) {
           break;
         case 't':
           Serial.println("mandando mensaje...");
-          error = Sim800L.sendSms("+541156628833", "1234567890");
+          error = Sim800L.sendSms(num_tel, "1234567890");
+          if (error) {
+            Serial.println("Error al enviar mensaje :C");
+          }else{
+            Serial.println("mensaje enviado!");
+          }
+          break;
+        case 'g':
+          Serial.println("mandando mensaje...");
+          error = Sim800L.sendSms(num_tel, "My Name is Walter White, I live in Arroyo sreet 1223");
           if (error) {
             Serial.println("Error al enviar mensaje :C");
           }else{
@@ -109,6 +120,7 @@ void loop() {
   #if (SERIAL_DEBUG)
   serial_process();
   #endif
+
 /*
 // Start communication with the computer
 Serial.begin(9600);

@@ -13,7 +13,7 @@
 #define BAUD_RATE 9600
 #define LED_FLAG	true 	// true: use led.	 false: don't user led.
 #define LED_PIN 	13 		// pin to indicate states.
-#define BUFFER_RESERVE_MEMORY	255
+#define BUFFER_RESERVE_MEMORY	510
 #define TIME_OUT_READ_SERIAL	5000
 
 #define SERIAL_DEBUG 1 // poner en 1 para controlar por terminal serial de arduino
@@ -33,6 +33,7 @@ TinyGsmClient client(modem);
 */
 //Sim800L Sim800L(RX_PIN, TX_PIN);
 bool error = false;
+char* num_tel = "+541156628833";
 String module_buffer;
 SoftwareSerial sw_serial(RX_PIN, TX_PIN);
 String _buffer;
@@ -80,17 +81,30 @@ String _readSerial_timeout(int timeout){
 }
 
 bool sendSms( String num, String msg){
+  sw_serial.println("\r\n"); //limpiar antes de mandar cosas
   sw_serial.println ("AT+CMGF=1"); 	//set sms to text mode
-  _buffer=_readSerial();
+  delay(100);
+  //_buffer=_readSerial();
+
   sw_serial.println ("AT+CMGS=\"" + num + "\"");  	// command to send sms
   //sw_serial.print (num);
   //sw_serial.println("\"");
-  _buffer=_readSerial();
+  delay(100);
+  //_buffer=_readSerial();
+  
   sw_serial.print (msg);
   //sw_serial.print ("\r");
-  _buffer=_readSerial();
+  delay(100);
+  //_buffer=_readSerial();
+  
   sw_serial.write(26);
+  delay(2000);
   _buffer=_readSerial_timeout(60000);
+  
+  #if SERIAL_DEBUG
+  Serial.println(_buffer);
+  #endif
+  
   // Serial.println(_buffer);
   //expect CMGS:xxx   , where xxx is a number,for the sending sms.
   if ((_buffer.indexOf("ER")) != -1) {
@@ -118,8 +132,6 @@ void setup() {
   if (LED_FLAG) pinMode(LED_PIN, OUTPUT);
 
   _buffer.reserve(BUFFER_RESERVE_MEMORY); // Reserve memory to prevent intern fragmention
-
-  sendSms("+541156628833", "Hello World!");
 }
 
 //funciones para testear y mandar comandos desde la computadora directamente al Arduino
@@ -154,7 +166,7 @@ bool serial_parse(void) {
   if (command.length() == 1) {
     if (command[0] == 'h'){
       Serial.println("mandando mensaje...");
-      error = sendSms("+541156628833", "Yo, World!");
+      error = sendSms(num_tel, "Yo, World!");
       delay(5000);
         if (error) {
           Serial.println("Error al enviar mensaje :C");
@@ -165,7 +177,7 @@ bool serial_parse(void) {
       switch(command[0]) {
         case 'q':
           Serial.println("mandando mensaje...");
-          error = sendSms("+541156628833", "Hello World!");
+          error = sendSms(num_tel, "Hello World!");
           delay(5000);
           if (error) {
             Serial.println("Error al enviar mensaje :C");
@@ -175,7 +187,17 @@ bool serial_parse(void) {
           break;
         case 't':
           Serial.println("mandando mensaje...");
-          error = sendSms("+541156628833", "1234567890");
+          error = sendSms(num_tel, "1234567890");
+          delay(5000);
+          if (error) {
+            Serial.println("Error al enviar mensaje :C");
+          }else{
+            Serial.println("mensaje enviado!");
+          }
+          break;
+        case 'g':
+          Serial.println("mandando mensaje...");
+          error = sendSms(num_tel, "ring ring ring ring ring ring ring, Banana Phone!");
           delay(5000);
           if (error) {
             Serial.println("Error al enviar mensaje :C");
