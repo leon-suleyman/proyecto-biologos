@@ -1,7 +1,6 @@
 #define TINY_GSM_MODEM_SIM800 // Define the GSM modem model before including the library
 //#include <TinyGsmClient.h>
 //#include <SoftwareSerial.h>
-#include <Sim800L.h>
 #include <SoftwareSerial.h>
 
 
@@ -15,6 +14,16 @@
 #define LED_PIN 	13 		// pin to indicate states.
 #define BUFFER_RESERVE_MEMORY	510
 #define TIME_OUT_READ_SERIAL	5000
+
+//Pins para comunicarse con el nano a menor distancia
+#define RX_NANO_UNDER_PIN A1
+#define TX_NANO_UNDER_PIN A2
+#define INTR_NANO_UNDER_PIN A3
+
+//Pins para comunicarse con el nano a mayor distnacia
+#define RX_NANO_DEEPER_PIN A4
+#define TX_NANO_DEEPER_PIN A5
+#define INTR_NANO_DEEPER_PIN A6
 
 #define SERIAL_DEBUG 1 // poner en 1 para controlar por terminal serial de arduino
 
@@ -35,24 +44,46 @@ TinyGsmClient client(modem);
 bool error = false;
 char* num_tel = "+541156628833";
 String module_buffer;
-SoftwareSerial sw_serial(RX_PIN, TX_PIN);
+SoftwareSerial SIM800L(RX_PIN, TX_PIN);
+SoftwareSerial NANO_UNDER(RX_NANO_UNDER_PIN, TX_NANO_UNDER_PIN);
 String _buffer;
 
-String _readSerial(){
+String _readSerial(SoftwareSerial sws){
   uint64_t timeOld = millis();
 
-  while (!sw_serial.available() && !(millis() > timeOld + TIME_OUT_READ_SERIAL))
+  while (!sws.available() && !(millis() > timeOld + TIME_OUT_READ_SERIAL))
   {
       delay(13);
   }
 
   String str;
 
-  while(sw_serial.available())
+  while(sws.available())
   {
-      if (sw_serial.available()>0)
+      if (sws.available()>0)
       {
-          str += (char) sw_serial.read();
+          str += (char) sws.read();
+      }
+  }
+
+  return str;
+}
+
+String _readSerialUnder(){
+  uint64_t timeOld = millis();
+
+  while (!NANO_UNDER.available() && !(millis() > timeOld + TIME_OUT_READ_SERIAL))
+  {
+      delay(13);
+  }
+
+  String str;
+
+  while(NANO_UNDER.available())
+  {
+      if (NANO_UNDER.available()>0)
+      {
+          str += (char) NANO_UNDER.read();
       }
   }
 
@@ -62,18 +93,18 @@ String _readSerial(){
 String _readSerial_timeout(int timeout){
   uint64_t timeOld = millis();
 
-  while (!sw_serial.available() && !(millis() > timeOld + timeout))
+  while (!SIM800L.available() && !(millis() > timeOld + timeout))
   {
       delay(13);
   }
 
   String str;
 
-  while(sw_serial.available())
+  while(SIM800L.available())
   {
-      if (sw_serial.available()>0)
+      if (SIM800L.available()>0)
       {
-          str += (char) sw_serial.read();
+          str += (char) SIM800L.read();
       }
   }
 
@@ -81,23 +112,23 @@ String _readSerial_timeout(int timeout){
 }
 
 bool sendSms( String num, String msg){
-  sw_serial.println("\r\n"); //limpiar antes de mandar cosas
-  sw_serial.println ("AT+CMGF=1"); 	//set sms to text mode
+  SIM800L.println("\r\n"); //limpiar antes de mandar cosas
+  SIM800L.println ("AT+CMGF=1"); 	//set sms to text mode
   delay(100);
   //_buffer=_readSerial();
 
-  sw_serial.println ("AT+CMGS=\"" + num + "\"");  	// command to send sms
-  //sw_serial.print (num);
-  //sw_serial.println("\"");
+  SIM800L.println ("AT+CMGS=\"" + num + "\"");  	// command to send sms
+  //SIM800L.print (num);
+  //SIM800L.println("\"");
   delay(100);
   //_buffer=_readSerial();
   
-  sw_serial.print (msg);
-  //sw_serial.print ("\r");
+  SIM800L.print (msg);
+  //SIM800L.print ("\r");
   delay(100);
   //_buffer=_readSerial();
   
-  sw_serial.write(26);
+  SIM800L.write(26);
   delay(2000);
   _buffer=_readSerial_timeout(60000);
   
@@ -127,7 +158,10 @@ void setup() {
 
   pinMode(RESET_PIN, OUTPUT);
 
-  sw_serial.begin(BAUD_RATE);
+  SIM800L.begin(BAUD_RATE);
+
+  NANO_UNDER.begin(BAUD_RATE);
+  pinMode(INTR_NANO_UNDER_PIN, OUTPUT);
 
   if (LED_FLAG) pinMode(LED_PIN, OUTPUT);
 
@@ -185,16 +219,6 @@ bool serial_parse(void) {
             Serial.println("mensaje enviado!");
           }
           break;
-        case 't':
-          Serial.println("mandando mensaje...");
-          error = sendSms(num_tel, "1234567890");
-          delay(5000);
-          if (error) {
-            Serial.println("Error al enviar mensaje :C");
-          }else{
-            Serial.println("mensaje enviado!");
-          }
-          break;
         case 'g':
           Serial.println("mandando mensaje...");
           error = sendSms(num_tel, "ring ring ring ring ring ring ring, Banana Phone!");
@@ -204,6 +228,18 @@ bool serial_parse(void) {
           }else{
             Serial.println("mensaje enviado!");
           }
+          break;
+        case 't':
+          digitalWrite(INTR_NANO_UNDER_PIN, LOW);
+          Serial.println("despertando al arduino under");
+          digitalWrite(INTR_NANO_UNDER_PIN, HIGH);
+          Serial.println("esperando para mensaje del nano under");
+          delay(2000);
+          Serial.println("leyendo mensaje del nano under");
+          _buffer = _readSerialUnder();
+          delay(100);
+          Serial.println(_buffer);
+          digitalWrite(INTR_NANO_UNDER_PIN, LOW);
           break;
       }
     }
