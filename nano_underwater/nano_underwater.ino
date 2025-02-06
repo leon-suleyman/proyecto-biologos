@@ -134,16 +134,16 @@ void loop()
   //printDate(now);
  
   // lee Fluorescencia
-    //lect_fluoro[indice_lectura_sensores] = readSensorFluoro();   //readSensorFluoro()
-    int var = readSensorFluoro();
+    lect_fluoro[indice_lectura_sensores] = readSensorFluoro();   //readSensorFluoro()
+    //int var = readSensorFluoro();
 
   // lee irradiancia
-    //lect_irradiancia[indice_lectura_sensores] = readSensorIrradiancia();
-    int var2 = readSensorIrradiancia();
+    lect_irradiancia[indice_lectura_sensores] = readSensorIrradiancia();
+    //int var2 = readSensorIrradiancia();
 
   // lee temperatura:
-    //lect_temperatura[indice_lectura_sensores] = readSensorTemperatura();
-    int Temp = readSensorTemperatura();
+    lect_temperatura[indice_lectura_sensores] = readSensorTemperatura();
+    //int Temp = readSensorTemperatura();
 
   //avanza indice de sensores
     //indice_lectura_sensores++;
@@ -177,16 +177,32 @@ void loop()
 
     now = rtc.now();
 
-    logValue("DATOS.txt", now, val, val2, Temp);
+    //logValue("DATOS.txt", now, val, val2, Temp);
 
-    String data_txt = readFile("DATOS.txt");
+    //String data_txt = readFile("DATOS.txt");
+    String data_txt = "";
+    for(int i = 0; i < indice_lectura_sensores; i++){
+      data_txt = data_txt + stringLecturaSensores(i);
+    }
     Serial.println(data_txt);
+
+    if(indice_lectura_sensores > 13){
+      indice_lectura_sensores = 0;
+    }
 
     delay(10000); // 60 segundos (TIEMPO de delay LOOP)
 }
 //termina el PP
 
 //desde aca Funciones declaracion:
+
+String stringLecturaSensores(int indice){
+  String lectura = "";
+  DateTime tiempo = tiempos_de_lecturas[indice];
+  lectura = lectura + String(tiempo.year()) + "/" + String(tiempo.month()) + "/" + String(tiempo.day()) + " " + String(tiempo.hour()) + ":" + String(tiempo.minute()) + ":" + String(tiempo.second()) + ";" ;
+  lectura = lectura + String(lect_fluoro[indice]) + ";" + String(lect_irradiancia[indice]) + ";" + String(lect_temperatura[indice]) + ";"; 
+  return lectura;
+}
 
 void reportarAlNanoSim(){
 
