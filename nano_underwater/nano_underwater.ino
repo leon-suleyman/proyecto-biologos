@@ -63,6 +63,12 @@ RTC_DS3231 rtc;
 String daysOfTheWeek[7] = { "Domingo", "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado" };
 String monthsNames[12] = { "Enero", "Febrero", "Marzo", "Abril", "Mayo",  "Junio", "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre" };
 
+DateTime tiempos_de_lecturas[13];
+int lect_fluoro[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int lect_irradiancia[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int lect_temperatura[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int indice_lectura_sensores = 0;
+
 
 void setup()
 {
@@ -128,20 +134,19 @@ void loop()
   //printDate(now);
  
   // lee Fluorescencia
-    int val = readSensorFluoro();   //readSensorFluoro()
+    //lect_fluoro[indice_lectura_sensores] = readSensorFluoro();   //readSensorFluoro()
+    int var = readSensorFluoro();
 
   // lee irradiancia
-    int val2 = readSensorIrradiancia();
+    //lect_irradiancia[indice_lectura_sensores] = readSensorIrradiancia();
+    int var2 = readSensorIrradiancia();
 
   // lee temperatura:
+    //lect_temperatura[indice_lectura_sensores] = readSensorTemperatura();
     int Temp = readSensorTemperatura();
 
-
-  if(SD.exists("DATOS.txt")){
-    Serial.println("Existe DATOS.txt");
-  }else{
-    Serial.println("No existe DATOS.txt");
-  }
+  //avanza indice de sensores
+    //indice_lectura_sensores++;
 
   // Abrir archivo y escribir valor - FTIR es: Fluorescencia, Temperatura, Irradiancia, Registro
     //File logFile = SD.open("DATOS.txt", FILE_WRITE);
@@ -169,6 +174,13 @@ void loop()
     //}else{
     //  Serial.println(F("Error al abrir el archivo"));
     //}
+
+    now = rtc.now();
+
+    logValue("DATOS.txt", now, val, val2, Temp);
+
+    String data_txt = readFile("DATOS.txt");
+    Serial.println(data_txt);
 
     delay(10000); // 60 segundos (TIEMPO de delay LOOP)
 }
@@ -248,41 +260,49 @@ int readSensorFluoro()
  
 }
 
-void logValue(File fs, DateTime date, int value, int value2, int value3)
+void logValue(String filepath, DateTime date, int value, int value2, int value3)
 {
-  //File fs = SD.open(filepath, FILE_WRITE);
-  //if(fs){
-//
-  //}else{
-  //  Serial.println("Error al abrir el archivo");
-  //}
+  File fs = SD.open(filepath, FILE_WRITE);
+  if(fs){
+    fs.print(date.year(), DEC);
+    fs.print('/');
+    fs.print(date.month(), DEC);
+    fs.print('/');
+    fs.print(date.day(), DEC);
+    fs.print(" ");
+    fs.print(date.hour(), DEC);
+    fs.print(':');
+    fs.print(date.minute(), DEC);
+    fs.print(':');
+    fs.print(date.second(), DEC);
+    fs.print(" ;");
+    fs.print(value);
+    fs.print('; ');
+    fs.print(value2);
+    fs.print('; ');
+    fs.println(value3);
 
-  fs.print(date.year(), DEC);
-  fs.print('/');
-  fs.print(date.month(), DEC);
-  fs.print('/');
-  fs.print(date.day(), DEC);
-  fs.print(" ");
-  fs.print(date.hour(), DEC);
-  fs.print(':');
-  fs.print(date.minute(), DEC);
-  fs.print(':');
-  fs.print(date.second(), DEC);
-  fs.print(" ;");
-  fs.print(value);
-  fs.print('; ');
-  fs.print(value2);
-  fs.print('; ');
-  fs.println(value3);
+    fs.close();
+  }else{
+    Serial.println("Error al abrir el archivo");
+  }
+
  
  
 }
 
-String readFile(File fs){
+String readFile(String filepath){
   String file_txt = "";
-  while(fs.peek() != -1){
-    char data = fs.read();
-    file_txt.concat(data);
+  File fs = SD.open(filepath, FILE_READ);
+  if(fs){
+    while(fs.peek() != -1){
+      char data = fs.read();
+      file_txt.concat(data);
+    }
+
+    fs.close();
+  }else{
+    Serial.println("Error al abrir el archivo");
   }
   return file_txt;
 }
