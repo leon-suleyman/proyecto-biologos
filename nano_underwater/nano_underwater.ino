@@ -55,32 +55,28 @@ SoftwareSerial nano_sim(pin_rx_sim, pin_tx_sim);
 Adafruit_ADS1115 ads;
 const float multiplier = 0.1875F;
 
-File logFile;
-
 // RTC_DS1307 rtc;
 RTC_DS3231 rtc;
 
-String daysOfTheWeek[7] = { "Domingo", "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado" };
-String monthsNames[12] = { "Enero", "Febrero", "Marzo", "Abril", "Mayo",  "Junio", "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre" };
+int ano_actual;
+int mes_actual;
+int dia_actual;
+int ult_hora_lectura;
+int lectura_hora[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
+int lectura_minuto[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
+int lectura_segundo[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
+int lectura_fluoro[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
+int lectura_irradiancia[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
+int lectura_temperatura[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
 
-DateTime tiempos_de_lecturas[13];
-int lect_fluoro[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-int lect_irradiancia[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-int lect_temperatura[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-int indice_lectura_sensores = 0;
+int indice_lectura = 0;
 
 
 void setup()
 {
   {
     Serial.begin(9600);
-    Serial.print(F("Iniciando SD ..."));
-    if (!SD.begin(10))
-    {
-      Serial.println(F("Error al iniciar"));
-      return;
-    }
-    Serial.println(F("Iniciado correctamente"));
+    Serial.print("Iniciando Sistema... ");
 
     sensor.begin(); //inicia el sensor de temp dallas
     // seteo del AD (ads1115)
@@ -101,6 +97,8 @@ void setup()
     pinMode(pinLed, OUTPUT); // pin LED en output fluorom
 
     digitalWrite(6, LOW);
+
+    Serial.println("Completado");
  
   }
 
@@ -120,6 +118,11 @@ void setup()
       // Fijar a fecha y hora específica. En el ejemplo, 21 de Enero de 2016 a las 03:00:00
       // rtc.adjust(DateTime(2016, 1, 21, 3, 0, 0));
     }
+    DateTime now = rtc.now();
+    ano_actual = now.year();
+    mes_actual = now.month();
+    dia_actual = now.day();
+    ult_hora_lectura = now.hour();
   }
 }   //termina el setup
 
@@ -131,58 +134,47 @@ void loop()
  
   // Obtener fecha actual del ds3231 y mostrar por Serial
     DateTime now = rtc.now();
+    lectura_hora[indice_lectura] = now.hour();
+    lectura_minuto[indice_lectura] = now.minute();
+    lectura_segundo[indice_lectura] = now.second();
   //printDate(now);
  
   // lee Fluorescencia
-    //lect_fluoro[indice_lectura_sensores] = readSensorFluoro();   //readSensorFluoro()
-    int var = readSensorFluoro();
+    lectura_fluoro[indice_lectura] = readSensorFluoro();
 
   // lee irradiancia
-    //lect_irradiancia[indice_lectura_sensores] = readSensorIrradiancia();
-    int var2 = readSensorIrradiancia();
+    lectura_irradiancia[indice_lectura] = readSensorIrradiancia();
 
   // lee temperatura:
-    //lect_temperatura[indice_lectura_sensores] = readSensorTemperatura();
-    int Temp = readSensorTemperatura();
+    lectura_temperatura[indice_lectura] = readSensorTemperatura();
 
-  //avanza indice de sensores
-    //indice_lectura_sensores++;
+    indice_lectura++;
 
-  // Abrir archivo y escribir valor - FTIR es: Fluorescencia, Temperatura, Irradiancia, Registro
-    //File logFile = SD.open("DATOS.txt", FILE_WRITE);
- //
-    //if (logFile) {
-   //
-    //  now = rtc.now();
-//
-    //  logValue(logFile, now, val, val2, Temp);
-    //  logFile.close();
-    ////apaga led
-    //  digitalWrite(6, LOW);
-   //
-//
-    //}else {
-    //  Serial.println(F("Error al abrir el archivo"));
-    //}
-//
-    //logFile = SD.open("DATOS.txt", FILE_READ);
-    //if (logFile){
-    //  String data_txt = readFile(logFile);
-    //  Serial.println(data_txt);
-//
-    //  logFile.close();
-    //}else{
-    //  Serial.println(F("Error al abrir el archivo"));
-    //}
+    for(int i = 0; i < indice_lectura; i++){
+      if(lectura_hora[i] < ult_hora_lectura){
+        ano_actual = now.year();
+        mes_actual = now.month();
+        dia_actual = now.day();
+      }
 
-    now = rtc.now();
+      String lectura_txt = "";
+      lectura_txt = lectura_txt + String(ano_actual) + "/" + String(mes_actual) + "/" + String(dia_actual) + " " + String(lectura_hora[i]) + ":" + String(lectura_minuto[i]) + ":" + String(lectura_segundo[i]) + ";";
+      lectura_txt = lectura_txt + String(lectura_fluoro[i]) + ";" + String(lectura_irradiancia[i]) + ";" + String(lectura_temperatura[i]);
+      Serial.println(lectura_txt);
 
-    logValue("DATOS.txt", now, val, val2, Temp);
+      ult_hora_lectura = lectura_hora[i];
+    }
 
-    String data_txt = readFile("DATOS.txt");
-    Serial.println(data_txt);
+    Serial.print("indice de lectura = ");
+    Serial.println(indice_lectura);
 
-    delay(10000); // 60 segundos (TIEMPO de delay LOOP)
+    if(indice_lectura > 12){
+      Serial.println("resetado indice de lectura");
+      indice_lectura = 0;
+      Serial.println("nuevo indice es " + String(indice_lectura));
+    }
+
+    delay(1000); // 60 segundos (TIEMPO de delay LOOP)
 }
 //termina el PP
 
@@ -260,49 +252,4 @@ int readSensorFluoro()
  
 }
 
-void logValue(String filepath, DateTime date, int value, int value2, int value3)
-{
-  File fs = SD.open(filepath, FILE_WRITE);
-  if(fs){
-    fs.print(date.year(), DEC);
-    fs.print('/');
-    fs.print(date.month(), DEC);
-    fs.print('/');
-    fs.print(date.day(), DEC);
-    fs.print(" ");
-    fs.print(date.hour(), DEC);
-    fs.print(':');
-    fs.print(date.minute(), DEC);
-    fs.print(':');
-    fs.print(date.second(), DEC);
-    fs.print(" ;");
-    fs.print(value);
-    fs.print('; ');
-    fs.print(value2);
-    fs.print('; ');
-    fs.println(value3);
 
-    fs.close();
-  }else{
-    Serial.println("Error al abrir el archivo");
-  }
-
- 
- 
-}
-
-String readFile(String filepath){
-  String file_txt = "";
-  File fs = SD.open(filepath, FILE_READ);
-  if(fs){
-    while(fs.peek() != -1){
-      char data = fs.read();
-      file_txt.concat(data);
-    }
-
-    fs.close();
-  }else{
-    Serial.println("Error al abrir el archivo");
-  }
-  return file_txt;
-}
