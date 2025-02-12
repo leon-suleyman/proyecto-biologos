@@ -77,7 +77,7 @@ String _readSerialUnder(){
       delay(13);
   }
 
-  String str;
+  String str = "";
 
   while(NANO_UNDER.available())
   {
@@ -234,11 +234,17 @@ bool serial_parse(void) {
           Serial.println("despertando al arduino under");
           digitalWrite(INTR_NANO_UNDER_PIN, HIGH);
           Serial.println("esperando para mensaje del nano under");
-          delay(2000);
-          Serial.println("leyendo mensaje del nano under");
-          _buffer = _readSerialUnder();
           delay(100);
-          Serial.println(_buffer);
+          Serial.println("leyendo mensaje del nano under");
+          for(int i = 0; i < 12 && NANO_UNDER.available(); i++){
+            _buffer = _readSerialUnder();
+            if(_buffer = ""){
+              break;
+            }
+            Serial.println(_buffer);
+            NANO_UNDER.print("llegó");
+            delay(100);
+          }
           digitalWrite(INTR_NANO_UNDER_PIN, LOW);
           break;
       }
