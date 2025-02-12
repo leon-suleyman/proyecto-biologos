@@ -33,7 +33,7 @@
 #include <SoftwareSerial.h>
 
 
-const int oneWirePin = 2; //sensor dallas
+const uint8_t oneWirePin = 2; //sensor dallas
 
 OneWire oneWireBus(oneWirePin);
 DallasTemperature sensor(&oneWireBus);
@@ -43,11 +43,11 @@ DallasTemperature sensor(&oneWireBus);
 
 
 
-const int pinDatosDQ = 2;                         // Pin donde se conecta el bus l-wire
-const int pinLed = 6; //led fluo
-const int pinIntrpt = 3;
-const int pin_rx_sim = 7;
-const int pin_tx_sim = 9;
+const uint8_t pinDatosDQ = 2;                         // Pin donde se conecta el bus l-wire
+const uint8_t pinLed = 6; //led fluo
+const uint8_t pinIntrpt = 3;
+const uint8_t pin_rx_sim = 7;
+const uint8_t pin_tx_sim = 9;
 
 SoftwareSerial nano_sim(pin_rx_sim, pin_tx_sim);
 
@@ -58,18 +58,19 @@ const float multiplier = 0.1875F;
 // RTC_DS1307 rtc;
 RTC_DS3231 rtc;
 
-int ano_actual;
-int mes_actual;
-int dia_actual;
-int ult_hora_lectura;
-int lectura_hora[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
-int lectura_minuto[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
-int lectura_segundo[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
-int lectura_fluoro[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
-int lectura_irradiancia[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
-int lectura_temperatura[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
+//variables globales de los datos leidos
+uint16_t ano_actual;
+uint8_t mes_actual;
+uint8_t dia_actual;
+uint8_t ult_hora_lectura;
+uint8_t lectura_hora[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
+uint8_t lectura_minuto[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
+uint8_t lectura_segundo[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
+uint8_t lectura_fluoro[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
+uint8_t lectura_irradiancia[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
+int8_t lectura_temperatura[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
 
-int indice_lectura = 0;
+uint8_t indice_lectura = 0;
 
 
 void setup()
@@ -148,6 +149,7 @@ void loop()
   // lee temperatura:
     lectura_temperatura[indice_lectura] = readSensorTemperatura();
 
+
     indice_lectura++;
 
     for(int i = 0; i < indice_lectura; i++){
@@ -164,14 +166,13 @@ void loop()
 
       ult_hora_lectura = lectura_hora[i];
     }
-
     Serial.print("indice de lectura = ");
     Serial.println(indice_lectura);
+    delay(100);
 
-    if(indice_lectura > 12){
-      Serial.println("resetado indice de lectura");
+    if(indice_lectura >= 12){
       indice_lectura = 0;
-      Serial.println("nuevo indice es " + String(indice_lectura));
+      software_Reset();
     }
 
     delay(1000); // 60 segundos (TIEMPO de delay LOOP)
@@ -179,6 +180,11 @@ void loop()
 //termina el PP
 
 //desde aca Funciones declaracion:
+
+void software_Reset() // Restarts program from beginning but does not reset the peripherals and registers
+{
+asm volatile ("  jmp 0");  
+}
 
 void reportarAlNanoSim(){
 
@@ -189,7 +195,6 @@ void reportarAlNanoSim(){
 // Funcion sensores
 int readSensorIrradiancia()
   {
-  int i;
   int sval = 0;
   ads.setGain(GAIN_ONE);      //  +/- 4.096V  1 bit = 0.125mV
   ads.begin();
@@ -197,15 +202,14 @@ int readSensorIrradiancia()
   // int16_t adc0, adc1;
 
  
-  for (i = 0; i < 5; i++){
-    sval = ads.readADC_SingleEnded(1);   // sensor on analog pin 0
+  for (int i = 0; i < 5; i++){
+    sval += ads.readADC_SingleEnded(1);   // sensor on analog pin 0
     delay(100);
   }
 
   sval = sval / 5;    //promedio de las 5 medidas tomadas cada 100 ms
 
   Serial.print("AIN1: "); Serial.println(sval);  //solo imprime por serie el 1 er valor - es para testeo unicamente -
-  Serial.println(" ");
   delay(10);
   return sval;
 }
@@ -217,7 +221,7 @@ int readSensorTemperatura()
   sensor.requestTemperatures();
   Serial.print("Temperatura en sensor 0: ");
   TempDallas = sensor.getTempCByIndex(0);
-  Serial.print(sensor.getTempCByIndex(0));
+  Serial.print(TempDallas);
   Serial.println(" ºC");
   return TempDallas;
 }
@@ -228,25 +232,18 @@ int readSensorFluoro()
 {
   ads.setGain(GAIN_FOUR);    //   +/- 1.024V  1 bit = 0.03125mV
   ads.begin();
-  int16_t adc0;
-  // int16_t adc0, adc1;
-  int i;
   int sval0 = 0;
   ads.setGain(GAIN_ONE);      //  +/- 4.096V  1 bit = 0.125mV
- 
-  //int16_t adc0;
-  // int16_t adc0, adc1;
 
  
-  for (i = 0; i < 5; i++){
-    sval0 = ads.readADC_SingleEnded(1);   // sensor on analog pin 0
+  for (int i = 0; i < 5; i++){
+    sval0 += ads.readADC_SingleEnded(1);   // sensor on analog pin 0
     delay(100);
   }
 
   sval0 = sval0 / 5;    //promedio de las 5 medidas tomadas cada 100 ms
 
   Serial.print("AIN0: "); Serial.println(sval0);  //solo imprime por serie el valor - es para testeo unicamente -
-  Serial.println(" ");
   delay(10);
   return sval0;
  
