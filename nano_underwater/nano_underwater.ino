@@ -96,6 +96,7 @@ void setup()
     ads.begin(); //ads1115
 
     nano_sim.begin(9600);
+    //nano_sim.println("Buen día!");
     attachInterrupt(digitalPinToInterrupt(pinIntrpt), reportarAlNanoSim, RISING);
 
     pinMode(pinLed, OUTPUT); // pin LED en output fluorom

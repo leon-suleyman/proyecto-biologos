@@ -231,14 +231,16 @@ bool serial_parse(void) {
           break;
         case 't':
           digitalWrite(INTR_NANO_UNDER_PIN, LOW);
+          delay(10);
           Serial.println("despertando al arduino under");
           digitalWrite(INTR_NANO_UNDER_PIN, HIGH);
           Serial.println("esperando para mensaje del nano under");
-          delay(100);
+          delay(1000);
           Serial.println("leyendo mensaje del nano under");
-          for(int i = 0; i < 12 && NANO_UNDER.available(); i++){
+          for(int i = 0; i < 12; i++){
             _buffer = _readSerialUnder();
             if(_buffer = ""){
+              Serial.println("buffer vacío");
               break;
             }
             Serial.println(_buffer);
