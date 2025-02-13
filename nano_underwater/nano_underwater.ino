@@ -7,7 +7,7 @@
 
 // pines:
 // D2: Dallas DS18b20
-// D3: interrupción para el nano con la SIM800L
+// D3: pin para mandar interrupción al nano con la SIM800L
 // D4: SDA  
 // D5: SCL   I2c para 2 chips: ADS1115: Addr= 0x48  y tambien RTC: DS3231: ADDR= 0x68
 // D6: Led Fluor
@@ -45,7 +45,7 @@ DallasTemperature sensor(&oneWireBus);
 
 const uint8_t pinDatosDQ = 2;                         // Pin donde se conecta el bus l-wire
 const uint8_t pinLed = 6; //led fluo
-const uint8_t pinIntrpt = 3;
+const uint8_t pin_interrupt_nano_sim = 3;
 const uint8_t pin_rx_sim = 7;
 const uint8_t pin_tx_sim = 9;
 
@@ -57,23 +57,6 @@ const float multiplier = 0.1875F;
 
 // RTC_DS1307 rtc;
 RTC_DS3231 rtc;
-
-//variables globales de los datos leidos
-uint16_t ano_actual;
-uint8_t mes_actual;
-uint8_t dia_actual;
-uint8_t ult_hora_lectura;
-uint8_t lectura_hora[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
-uint8_t lectura_minuto[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
-uint8_t lectura_segundo[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
-uint8_t lectura_fluoro[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
-uint8_t lectura_irradiancia[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
-int8_t lectura_temperatura[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
-
-uint8_t indice_lectura = 0;
-
-//Estados para cambiar entre sensar y comunicarse con el Arduino Nano con el SIM800L
-enum : byte {READ, WRITE} estado = READ;
 
 
 void setup()
@@ -97,11 +80,12 @@ void setup()
 
     nano_sim.begin(9600);
     //nano_sim.println("Buen día!");
-    attachInterrupt(digitalPinToInterrupt(pinIntrpt), reportarAlNanoSim, RISING);
 
     pinMode(pinLed, OUTPUT); // pin LED en output fluorom
+    pinMode(pin_interrupt_nano_sim, OUTPUT);
 
     digitalWrite(6, LOW);
+    digitalWrite(pin_interrupt_nano_sim, LOW);
 
     Serial.println("Completado");
  
@@ -123,11 +107,6 @@ void setup()
       // Fijar a fecha y hora específica. En el ejemplo, 21 de Enero de 2016 a las 03:00:00
       // rtc.adjust(DateTime(2016, 1, 21, 3, 0, 0));
     }
-    DateTime now = rtc.now();
-    ano_actual = now.year();
-    mes_actual = now.month();
-    dia_actual = now.day();
-    ult_hora_lectura = now.hour();
   }
 }   //termina el setup
 
@@ -136,71 +115,44 @@ void loop()
 {
   //primero que nada consigo fecha y hora para usar.
   DateTime now = rtc.now();
-  switch (estado){
-    //Si estamos en modo lectura:
-    case READ:
-      //y tenemos espacio para escribir más cosas en nuestra memoria
-      if(indice_lectura <= 12){
-        digitalWrite(6, HIGH);
-        //delay(120000); //2 min para el led
-    
-      // guardar hora actual del sensado
-        lectura_hora[indice_lectura] = now.hour();
-        lectura_minuto[indice_lectura] = now.minute();
-        lectura_segundo[indice_lectura] = now.second();
-    
-      // lee Fluorescencia
-        lectura_fluoro[indice_lectura] = readSensorFluoro();
 
-      // lee irradiancia
-        lectura_irradiancia[indice_lectura] = readSensorIrradiancia();
+  digitalWrite(6, HIGH);
+  //delay(120000); //2 min para el led
 
-      // lee temperatura:
-        lectura_temperatura[indice_lectura] = readSensorTemperatura();
+// lee Fluorescencia
+  int fluoro = readSensorFluoro();
 
-        indice_lectura++;
+// lee irradiancia
+  int irradiancia = readSensorIrradiancia();
 
-        digitalWrite(6, LOW);
-      }
-      break;
+// lee temperatura:
+  int temperatura = readSensorTemperatura();
 
-    case WRITE:
+  digitalWrite(6, LOW);
+  //mando interrupción al nano SIM para que me escuche los datos que mando;
+  digitalWrite(pin_interrupt_nano_sim, HIGH);
+  bool recibido = false;
+  int timeOld = millis();
+  while(!recibido && (millis() <= timeOld + 5000)){
+    //armo el string que voy a pasarle al nano_sim
+    String lectura_txt = "";
+    lectura_txt = lectura_txt + String(now.year()) + "/" + String(now.month()) + "/" + String(now.day()) + " " + String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second()) + ";";
+    lectura_txt = lectura_txt + String(fluoro) + ";" + String(irradiancia) + ";" + String(temperatura);
+    //se lo paso por software serial
+    nano_sim.println(lectura_txt);
+    delay(100);
+    if(_readSerialSIM() == "llegó"){
+      recibido = true;
+    }
 
-      for(int i = 0; i < indice_lectura; i++){
-        //si cambió el día entonces es el actual
-        if(lectura_hora[i] < ult_hora_lectura){
-          ano_actual = now.year();
-          mes_actual = now.month();
-          dia_actual = now.day();
-        }
-        //armo el string que voy a pasarle al nano_sim
-        String lectura_txt = "";
-        lectura_txt = lectura_txt + String(ano_actual) + "/" + String(mes_actual) + "/" + String(dia_actual) + " " + String(lectura_hora[i]) + ":" + String(lectura_minuto[i]) + ":" + String(lectura_segundo[i]) + ";";
-        lectura_txt = lectura_txt + String(lectura_fluoro[i]) + ";" + String(lectura_irradiancia[i]) + ";" + String(lectura_temperatura[i]);
-        //se lo paso por software serial
-        nano_sim.println(lectura_txt);
+  digitalWrite(pin_interrupt_nano_sim, LOW);
 
-        ult_hora_lectura = lectura_hora[i];
-
-        delay(100);
-
-        if(_readSerialSIM() != "llegó"){
-          estado = READ;
-          indice_lectura = 0;
-          break;
-        }
-      }
-      //si terminé sin errores, cambio a READ y hago un reseteo del programa para limpiar la memoria.
-      if(estado == WRITE){
-        estado = READ;
-        indice_lectura = 0;
-        software_Reset();
-      }
-
-      break;
   }
+  
+  delay(1000); // 60 segundos (TIEMPO de delay LOOP)
 
-    delay(1000); // 60 segundos (TIEMPO de delay LOOP)
+  software_Reset();
+
 }
 //termina el PP
 
@@ -209,11 +161,6 @@ void loop()
 void software_Reset() // Restarts program from beginning but does not reset the peripherals and registers
 {
 asm volatile ("  jmp 0");  
-}
-
-//cambia el estado cuando le manda una interrupción el nano con la SIM, ahora va a pasarle las lecturas a ese nano.
-void reportarAlNanoSim(){
-  estado = WRITE;
 }
 
 //lee la comunicación serial con el arduino nano con el sim800L
