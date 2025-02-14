@@ -83,9 +83,7 @@ void loop() {
       serial_process();
       #endif
       if(indice_lecturas_under >= 12){
-        indice_lecturas_under = 0;
-        lecturas_nano_under = "";
-        //lecturas_nano_under[0] = NULL;
+        estado = SEND_SMS;
       }
       break;
     case READ_UNDER:
@@ -114,6 +112,13 @@ void loop() {
         Serial.println("Error con la llegada de datos");
         #endif
       }
+      estado = IDLE;
+      break;
+
+    case SEND_SMS:
+      sendSms(num_tel, lecturas_nano_under);
+      indice_lecturas_under = 0;
+      lecturas_nano_under = "";
       estado = IDLE;
       break;
   }
