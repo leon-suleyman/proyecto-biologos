@@ -138,8 +138,9 @@ void loop()
     String lectura_txt = "";
     lectura_txt = lectura_txt + String(now.year()) + "/" + String(now.month()) + "/" + String(now.day()) + " " + String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second()) + ";";
     lectura_txt = lectura_txt + String(fluoro) + ";" + String(irradiancia) + ";" + String(temperatura);
+    lectura_txt = lectura_txt + "\n";
     //se lo paso por software serial
-    nano_sim.println(lectura_txt);
+    nano_sim.print(lectura_txt);
     delay(100);
     if(_readSerialSIM() == "llegó"){
       recibido = true;
@@ -149,7 +150,7 @@ void loop()
 
   }
   
-  delay(1000); // 60 segundos (TIEMPO de delay LOOP)
+  delay(3000); // 60 segundos (TIEMPO de delay LOOP)
 
   software_Reset();
 
