@@ -22,12 +22,10 @@
 
 
 #include <SPI.h>              // Include SPI library (needed for the SD card)
-#include <SD.h>               // Include SD library
 #include <OneWire.h>               // Incluir promagra OneWire lectura
 #include <DallasTemperature.h>   // Incluir programa DallaTemperature lectura
 #include <Adafruit_ADS1X15.h>  // incluye libreria conversor ADS1115
 #include <Wire.h>   // incluye libreria para lector temperatura DS18B20
-#include "SD.h"    //incluye libreria para modulo tarjeta SD
 #include <RTClib.h>   // incluye libreria para el manejo del modulo RTC DS3231
 #include <SPI.h>
 #include <SoftwareSerial.h>
@@ -77,10 +75,11 @@ void setup()
   
   
     ads.begin(); //ads1115
-
+    Serial.println("abro comunicación con el sistema de telecomunicación");
     nano_sim.begin(9600);
     //nano_sim.println("Buen día!");
 
+    Serial.begin("Iniciando Led para fluorecencia");
     pinMode(pinLed, OUTPUT); // pin LED en output fluorom
     pinMode(pin_interrupt_nano_sim, OUTPUT);
 
@@ -93,6 +92,7 @@ void setup()
 
   //dde aca inicia el RTC:
   {
+    Serial.println("Iniciando RTC");
     if (!rtc.begin()) {
       Serial.println(F("No encuentro al RTC: Verificar conexiones y bateria"));
       while (1);
@@ -107,6 +107,8 @@ void setup()
       // Fijar a fecha y hora específica. En el ejemplo, 21 de Enero de 2016 a las 03:00:00
       // rtc.adjust(DateTime(2016, 1, 21, 3, 0, 0));
     }
+    Serial.println("RTC iniciado");
+    
   }
 }   //termina el setup
 
@@ -153,6 +155,7 @@ void loop()
   delay(3000); // 60 segundos (TIEMPO de delay LOOP)
 
   software_Reset();
+
 
 }
 //termina el PP
@@ -242,5 +245,3 @@ int readSensorFluoro()
   return sval0;
  
 }
-
-
