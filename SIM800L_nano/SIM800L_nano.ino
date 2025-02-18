@@ -49,14 +49,12 @@ SoftwareSerial NANO_UNDER(RX_NANO_UNDER_PIN, TX_NANO_UNDER_PIN);
 //String _buffer;
 char _buffer[64];
 
-//String lecturas_nano_under = "";
-//String lecturas_nano_deeper = "";
-char lecturas_nano_under[400];
-char lecturas_nano_deeper[400];
+char lecturas_nano_under[500];
+char lecturas_nano_deeper[500];
 int indice_lecturas_under = 0;
 int indice_lecturas_deeper = 0;
 //defino el delimitador para parsear las lecturas al enviarlas por SMS
-char delimitador[] = "|";
+//char delimitador[] = "|";
 
 enum : byte {IDLE, READ_UNDER, READ_DEEPER, SEND_SMS} estado = IDLE;
 
@@ -95,15 +93,12 @@ void loop() {
       //anulamos el buffer previo
       _buffer[0] = NULL;
       //leo el buffer de la comunicación
-      //strcat(_buffer, _readSerialUnder());
       _readSerialUnder().toCharArray(_buffer, sizeof(_buffer));
-      //_buffer = _readSerialUnder();
       //si me llegó algo
       if(_buffer[0] != NULL){
         //guardo los datos y le aviso que llegaron
-        //lecturas_nano_under += _buffer;
         strcat(lecturas_nano_under, _buffer);
-        strcat(lecturas_nano_under, delimitador);
+        //strcat(lecturas_nano_under, delimitador);
         indice_lecturas_under++;
         NANO_UNDER.print("llegó");
         //imprimo en pantalla si estamos en modo debug
@@ -129,9 +124,8 @@ void loop() {
       #if (SERIAL_DEBUG)
       Serial.println("Datos enviados por SMS");
       #endif
-      indice_lecturas_under = 0;
-      //lecturas_nano_under = "";
       lecturas_nano_under[0] = NULL;
+      indice_lecturas_under = 0;
       estado = IDLE;
       break;
   }
@@ -197,36 +191,57 @@ void sendLongSms(char* num, char* message){
   char buffer_envios[160];
   buffer_envios[0] = NULL;
   char datos_de_lectura[50];
-  strcat(datos_de_lectura, strtok(lecturas_nano_under, delimitador));
-  //datos_de_lectura = strtok(lecturas_nano_under, delimiter);
+  datos_de_lectura[0] = NULL;
+  char caracter;
   int i = 0;
-  while(datos_de_lectura && i < 12){
-    #if (SERIAL_DEBUG)
-      Serial.println(i);
-      Serial.print("datos de lectura : ");
-      Serial.println(datos_de_lectura);
-    #endif
-    if(strlen(datos_de_lectura) + strlen(buffer_envios) > 160){
+  int cant_chars = strlen(message);
+  //indice para el caracter NULL en datos_de_lectura
+  int indice_fin_string = 0;
+  while(message[i] != NULL && i < cant_chars){
+    //agrego el proximo caracter
+    char caracter = message[i];
+    datos_de_lectura[indice_fin_string + 1] = NULL;
+    datos_de_lectura[indice_fin_string] = caracter;
+    indice_fin_string += 1;
+
+    //si es un end of line, tenemos una lectura completa en datos_de_lectura y podemos agregarla al mensaje
+    if(caracter == '\n'){
+      /*
       #if (SERIAL_DEBUG)
-        Serial.print("SMS saliente : ");
+        Serial.print("datos de lectura : ");
+        Serial.println(datos_de_lectura);
+      #endif
+      */
+      //si el mensaje se excede al agregar, entonces lo enviamos  y despues lo agregamos
+      if(strlen(datos_de_lectura) < 160 && strlen(datos_de_lectura) + strlen(buffer_envios) >= 160){
+        #if (SERIAL_DEBUG)
+          Serial.print("SMS saliente : ");
+          Serial.println(buffer_envios);
+        #endif
+        //sendSms(num, buffer_envios);
+        buffer_envios[0] = NULL;
+      }
+      strcat(buffer_envios, datos_de_lectura);
+      //strcat(buffer_envios, "\n");
+      /*
+      #if (SERIAL_DEBUG)
+        Serial.print("buffer de envio : ");
         Serial.println(buffer_envios);
       #endif
-      sendSms(num, buffer_envios);
-      buffer_envios[0] = NULL;
+      */
+      datos_de_lectura[0] = NULL;
+      indice_fin_string = 0;
     }
-    strcat(buffer_envios, datos_de_lectura);
-    //strcat(buffer_envios, "\n");
-    #if (SERIAL_DEBUG)
-      Serial.print("buffer de envio : ");
-      Serial.println(buffer_envios);
-    #endif
-    datos_de_lectura[0] = NULL;
-    strcat(datos_de_lectura, strtok(NULL, delimitador));
-    //datos_de_lectura = strtok(NULL, delimiter);
+
     i++;
   }
-  sendSms(num, buffer_envios);
+  #if (SERIAL_DEBUG)
+    Serial.print("SMS saliente : ");
+    Serial.println(buffer_envios);
+  #endif
+  //sendSms(num, buffer_envios);
 }
+
 bool sendSms( String num, String msg){
   SIM800L.println("\r\n"); //limpiar antes de mandar cosas
   SIM800L.println ("AT+CMGF=1"); 	//set sms to text mode
@@ -385,15 +400,16 @@ bool serial_parse(void) {
           }
           break;
         case 't':
-          _buffer[0] = NULL;
-          //strcat(_buffer, _readSerialUnder());
-          _readSerialUnder().toCharArray(_buffer, sizeof(_buffer));
-          //_buffer = _readSerialUnder();
-          if(_buffer[0] == NULL){
-            Serial.println("buffer vacío");
-            break;
+          for(int i = 0; i<12; i++){
+            strcat(lecturas_nano_under, "2025");
+            strcat(lecturas_nano_under, "/");
+            strcat(lecturas_nano_under, "02");
+            strcat(lecturas_nano_under,"/");
+            strcat(lecturas_nano_under,"18 00:00:00;0000;0000;-000");
+            strcat(lecturas_nano_under, "\n");
           }
-          Serial.println(_buffer);
+          sendLongSms(num_tel, lecturas_nano_under);
+
           break;
       }
     }
@@ -404,4 +420,3 @@ bool serial_parse(void) {
   return true;
 }
 #endif
-
