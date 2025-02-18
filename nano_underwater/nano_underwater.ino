@@ -7,7 +7,7 @@
 
 // pines:
 // D2: Dallas DS18b20
-// D3: interrupción para el nano con la SIM800L
+// D3: pin para mandar interrupción al nano con la SIM800L
 // D4: SDA  
 // D5: SCL   I2c para 2 chips: ADS1115: Addr= 0x48  y tambien RTC: DS3231: ADDR= 0x68
 // D6: Led Fluor
@@ -31,7 +31,7 @@
 #include <SoftwareSerial.h>
 
 
-const int oneWirePin = 2; //sensor dallas
+const uint8_t oneWirePin = 2; //sensor dallas
 
 OneWire oneWireBus(oneWirePin);
 DallasTemperature sensor(&oneWireBus);
@@ -41,11 +41,11 @@ DallasTemperature sensor(&oneWireBus);
 
 
 
-const int pinDatosDQ = 2;                         // Pin donde se conecta el bus l-wire
-const int pinLed = 6; //led fluo
-const int pinIntrpt = 3;
-const int pin_rx_sim = 7;
-const int pin_tx_sim = 9;
+const uint8_t pinDatosDQ = 2;                         // Pin donde se conecta el bus l-wire
+const uint8_t pinLed = 6; //led fluo
+const uint8_t pin_interrupt_nano_sim = 3;
+const uint8_t pin_rx_sim = 7;
+const uint8_t pin_tx_sim = 9;
 
 SoftwareSerial nano_sim(pin_rx_sim, pin_tx_sim);
 
@@ -53,26 +53,15 @@ SoftwareSerial nano_sim(pin_rx_sim, pin_tx_sim);
 Adafruit_ADS1115 ads;
 const float multiplier = 0.1875F;
 
-
 // RTC_DS1307 rtc;
 RTC_DS3231 rtc;
-
-String daysOfTheWeek[7] = { "Domingo", "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado" };
-String monthsNames[12] = { "Enero", "Febrero", "Marzo", "Abril", "Mayo",  "Junio", "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre" };
-
-DateTime tiempos_de_lecturas[13];
-
-int lect_fluoro[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-int lect_irradiancia[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-int lect_temperatura[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-int indice_lectura_sensores = 0;
 
 
 void setup()
 {
   {
     Serial.begin(9600);
-    Serial.println("Iniciando sistema");
+    Serial.print("Iniciando Sistema... ");
 
     sensor.begin(); //inicia el sensor de temp dallas
     // seteo del AD (ads1115)
@@ -88,12 +77,16 @@ void setup()
     ads.begin(); //ads1115
     Serial.println("abro comunicación con el sistema de telecomunicación");
     nano_sim.begin(9600);
-    attachInterrupt(digitalPinToInterrupt(pinIntrpt), reportarAlNanoSim, RISING);
+    //nano_sim.println("Buen día!");
 
     Serial.begin("Iniciando Led para fluorecencia");
     pinMode(pinLed, OUTPUT); // pin LED en output fluorom
+    pinMode(pin_interrupt_nano_sim, OUTPUT);
 
     digitalWrite(6, LOW);
+    digitalWrite(pin_interrupt_nano_sim, LOW);
+
+    Serial.println("Completado");
  
   }
 
@@ -122,65 +115,83 @@ void setup()
 
 void loop()
 {
-    Serial.println("Tomando valores de los sensores");
-    digitalWrite(6, HIGH);
-    //delay(120000); //2 min para el led
- 
-  // Obtener fecha actual del ds3231 y mostrar por Serial
-    DateTime now = rtc.now();
-  //printDate(now);
-    tiempos_de_lecturas[indice_lectura_sensores] = now;
- 
-  // lee Fluorescencia
-    lect_fluoro[indice_lectura_sensores] = readSensorFluoro();   //readSensorFluoro()
+  //primero que nada consigo fecha y hora para usar.
+  DateTime now = rtc.now();
 
-  // lee irradiancia
-    lect_irradiancia[indice_lectura_sensores] = readSensorIrradiancia();
+  digitalWrite(6, HIGH);
+  //delay(120000); //2 min para el led
 
-  // lee temperatura:
-    lect_temperatura[indice_lectura_sensores] = readSensorTemperatura();
+// lee Fluorescencia
+  int fluoro = readSensorFluoro();
 
-  //avanza indice de sensores
-    indice_lectura_sensores++;
+// lee irradiancia
+  int irradiancia = readSensorIrradiancia();
 
-    //String data_txt = readFile("DATOS.txt");
-    Serial.println("imprimiendo datos recoletados");
-    String data_txt = "";
-    for(int i = 0; i < indice_lectura_sensores; i++){
-      data_txt = data_txt + stringLecturaSensores(i);
+// lee temperatura:
+  int temperatura = readSensorTemperatura();
+
+  digitalWrite(6, LOW);
+  //mando interrupción al nano SIM para que me escuche los datos que mando;
+  digitalWrite(pin_interrupt_nano_sim, HIGH);
+  bool recibido = false;
+  int timeOld = millis();
+  while(!recibido && (millis() <= timeOld + 5000)){
+    //armo el string que voy a pasarle al nano_sim
+    String lectura_txt = "";
+    lectura_txt = lectura_txt + String(now.year()) + "/" + String(now.month()) + "/" + String(now.day()) + " " + String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second()) + ";";
+    lectura_txt = lectura_txt + String(fluoro) + ";" + String(irradiancia) + ";" + String(temperatura);
+    lectura_txt = lectura_txt + "\n";
+    //se lo paso por software serial
+    nano_sim.print(lectura_txt);
+    delay(100);
+    if(_readSerialSIM() == "llegó"){
+      recibido = true;
     }
-    Serial.println(data_txt);
 
-    if(indice_lectura_sensores > 13){
-      indice_lectura_sensores = 0;
-    }
+  digitalWrite(pin_interrupt_nano_sim, LOW);
 
-    digitalWrite(6, LOW);
+  }
+  
+  delay(3000); // 60 segundos (TIEMPO de delay LOOP)
 
-    delay(10000); // 60 segundos (TIEMPO de delay LOOP)
+  software_Reset();
+
+
 }
 //termina el PP
 
 //desde aca Funciones declaracion:
 
-String stringLecturaSensores(int indice){
-  String lectura = "";
-  DateTime tiempo = tiempos_de_lecturas[indice];
-  lectura = lectura + String(tiempo.year()) + "/" + String(tiempo.month()) + "/" + String(tiempo.day()) + " " + String(tiempo.hour()) + ":" + String(tiempo.minute()) + ":" + String(tiempo.second()) + ";" ;
-  lectura = lectura + String(lect_fluoro[indice]) + ";" + String(lect_irradiancia[indice]) + ";" + String(lect_temperatura[indice]) + ";"; 
-  return lectura;
+void software_Reset() // Restarts program from beginning but does not reset the peripherals and registers
+{
+asm volatile ("  jmp 0");  
 }
 
-void reportarAlNanoSim(){
+//lee la comunicación serial con el arduino nano con el sim800L
+String _readSerialSIM(){
+  uint64_t timeOld = millis();
 
-  nano_sim.println("Hello World!");
+  while (!nano_sim.available() && !(millis() > timeOld + 5000))
+  {
+      delay(13);
+  }
 
+  String str;
+
+  while(nano_sim.available())
+  {
+      if (nano_sim.available()>0)
+      {
+          str += (char) nano_sim.read();
+      }
+  }
+
+  return str;
 }
 
 // Funcion sensores
 int readSensorIrradiancia()
   {
-  int i;
   int sval = 0;
   ads.setGain(GAIN_ONE);      //  +/- 4.096V  1 bit = 0.125mV
   ads.begin();
@@ -188,15 +199,14 @@ int readSensorIrradiancia()
   // int16_t adc0, adc1;
 
  
-  for (i = 0; i < 5; i++){
-    sval = ads.readADC_SingleEnded(1);   // sensor on analog pin 0
+  for (int i = 0; i < 5; i++){
+    sval += ads.readADC_SingleEnded(1);   // sensor on analog pin 0
     delay(100);
   }
 
   sval = sval / 5;    //promedio de las 5 medidas tomadas cada 100 ms
 
   Serial.print("AIN1: "); Serial.println(sval);  //solo imprime por serie el 1 er valor - es para testeo unicamente -
-  Serial.println(" ");
   delay(10);
   return sval;
 }
@@ -208,7 +218,7 @@ int readSensorTemperatura()
   sensor.requestTemperatures();
   Serial.print("Temperatura en sensor 0: ");
   TempDallas = sensor.getTempCByIndex(0);
-  Serial.print(sensor.getTempCByIndex(0));
+  Serial.print(TempDallas);
   Serial.println(" ºC");
   return TempDallas;
 }
@@ -219,25 +229,18 @@ int readSensorFluoro()
 {
   ads.setGain(GAIN_FOUR);    //   +/- 1.024V  1 bit = 0.03125mV
   ads.begin();
-  int16_t adc0;
-  // int16_t adc0, adc1;
-  int i;
   int sval0 = 0;
   ads.setGain(GAIN_ONE);      //  +/- 4.096V  1 bit = 0.125mV
- 
-  //int16_t adc0;
-  // int16_t adc0, adc1;
 
  
-  for (i = 0; i < 5; i++){
-    sval0 = ads.readADC_SingleEnded(1);   // sensor on analog pin 0
+  for (int i = 0; i < 5; i++){
+    sval0 += ads.readADC_SingleEnded(1);   // sensor on analog pin 0
     delay(100);
   }
 
   sval0 = sval0 / 5;    //promedio de las 5 medidas tomadas cada 100 ms
 
   Serial.print("AIN0: "); Serial.println(sval0);  //solo imprime por serie el valor - es para testeo unicamente -
-  Serial.println(" ");
   delay(10);
   return sval0;
  

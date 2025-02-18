@@ -12,18 +12,18 @@
 #define BAUD_RATE 9600
 #define LED_FLAG	true 	// true: use led.	 false: don't user led.
 #define LED_PIN 	13 		// pin to indicate states.
-#define BUFFER_RESERVE_MEMORY	510
+#define BUFFER_RESERVE_MEMORY	350
 #define TIME_OUT_READ_SERIAL	5000
 
 //Pins para comunicarse con el nano a menor distancia
-#define RX_NANO_UNDER_PIN A1
-#define TX_NANO_UNDER_PIN A2
-#define INTR_NANO_UNDER_PIN A3
+#define RX_NANO_UNDER_PIN 7
+#define TX_NANO_UNDER_PIN 6
+#define INTR_NANO_UNDER_PIN 3
 
 //Pins para comunicarse con el nano a mayor distnacia
-#define RX_NANO_DEEPER_PIN A4
-#define TX_NANO_DEEPER_PIN A5
-#define INTR_NANO_DEEPER_PIN A6
+#define RX_NANO_DEEPER_PIN 5
+#define TX_NANO_DEEPER_PIN 4
+#define INTR_NANO_DEEPER_PIN 2
 
 #define SERIAL_DEBUG 1 // poner en 1 para controlar por terminal serial de arduino
 
@@ -43,32 +43,106 @@ TinyGsmClient client(modem);
 //Sim800L Sim800L(RX_PIN, TX_PIN);
 bool error = false;
 char* num_tel = "+541156628833";
-String module_buffer;
+
 SoftwareSerial SIM800L(RX_PIN, TX_PIN);
 SoftwareSerial NANO_UNDER(RX_NANO_UNDER_PIN, TX_NANO_UNDER_PIN);
-String _buffer;
+//String _buffer;
+char _buffer[64];
 
-String _readSerial(SoftwareSerial sws){
-  uint64_t timeOld = millis();
+//String lecturas_nano_under = "";
+//String lecturas_nano_deeper = "";
+char lecturas_nano_under[400];
+char lecturas_nano_deeper[400];
+int indice_lecturas_under = 0;
+int indice_lecturas_deeper = 0;
+//defino el delimitador para parsear las lecturas al enviarlas por SMS
+char delimitador[] = "|";
 
-  while (!sws.available() && !(millis() > timeOld + TIME_OUT_READ_SERIAL))
-  {
-      delay(13);
-  }
+enum : byte {IDLE, READ_UNDER, READ_DEEPER, SEND_SMS} estado = IDLE;
 
-  String str;
 
-  while(sws.available())
-  {
-      if (sws.available()>0)
-      {
-          str += (char) sws.read();
-      }
-  }
+//setup al prenderse el dispositivo
+void setup() {
+  #if (SERIAL_DEBUG)
+  Serial.begin(BAUD_RATE);
+  Serial.println("Bienvenide al sistema de detección y comunicación");
+  #endif
 
-  return str;
+  pinMode(RESET_PIN, OUTPUT);
+
+  SIM800L.begin(BAUD_RATE);
+
+  NANO_UNDER.begin(BAUD_RATE);
+  attachInterrupt(digitalPinToInterrupt(INTR_NANO_UNDER_PIN), interrupcionUnder, RISING);
+
+  if (LED_FLAG) pinMode(LED_PIN, OUTPUT);
+
+  //_buffer.reserve(BUFFER_RESERVE_MEMORY); // Reserve memory to prevent intern fragmention
 }
 
+void loop() {
+  switch(estado){
+    case IDLE:
+      #if (SERIAL_DEBUG)
+      serial_process();
+      #endif
+      if(indice_lecturas_under >= 12){
+        estado = SEND_SMS;
+      }
+      break;
+    case READ_UNDER:
+      delay(100);
+      //anulamos el buffer previo
+      _buffer[0] = NULL;
+      //leo el buffer de la comunicación
+      //strcat(_buffer, _readSerialUnder());
+      _readSerialUnder().toCharArray(_buffer, sizeof(_buffer));
+      //_buffer = _readSerialUnder();
+      //si me llegó algo
+      if(_buffer[0] != NULL){
+        //guardo los datos y le aviso que llegaron
+        //lecturas_nano_under += _buffer;
+        strcat(lecturas_nano_under, _buffer);
+        strcat(lecturas_nano_under, delimitador);
+        indice_lecturas_under++;
+        NANO_UNDER.print("llegó");
+        //imprimo en pantalla si estamos en modo debug
+        #if (SERIAL_DEBUG)
+        Serial.print("\"");
+        Serial.print(lecturas_nano_under);
+        Serial.print("\"");
+        Serial.println(indice_lecturas_under);
+        #endif
+      }else{
+        #if (SERIAL_DEBUG)
+        Serial.println("Error con la llegada de datos");
+        #endif
+      }
+      estado = IDLE;
+      break;
+
+    case SEND_SMS:
+      #if (SERIAL_DEBUG)
+      Serial.println("Por enviar datos por SMS");
+      #endif
+      sendLongSms(num_tel, lecturas_nano_under);
+      #if (SERIAL_DEBUG)
+      Serial.println("Datos enviados por SMS");
+      #endif
+      indice_lecturas_under = 0;
+      //lecturas_nano_under = "";
+      lecturas_nano_under[0] = NULL;
+      estado = IDLE;
+      break;
+  }
+}
+
+//Interrupciones
+void interrupcionUnder(){
+  estado = READ_UNDER;
+}
+
+//lectura serial
 String _readSerialUnder(){
   uint64_t timeOld = millis();
 
@@ -77,12 +151,15 @@ String _readSerialUnder(){
       delay(13);
   }
 
-  String str;
+  String str = "";
 
   while(NANO_UNDER.available())
   {
       if (NANO_UNDER.available()>0)
-      {
+      { 
+          //int end_of_string = strlen(str);
+          //str[end_of_string] = (char) NANO_UNDER.read();
+          //str[end_of_string + 1] = NULL;
           str += (char) NANO_UNDER.read();
       }
   }
@@ -98,19 +175,58 @@ String _readSerial_timeout(int timeout){
       delay(13);
   }
 
-  String str;
+  String str = "";
 
   while(SIM800L.available())
   {
       if (SIM800L.available()>0)
       {
-          str += (char) SIM800L.read();
+          //int end_of_string = strlen(str);
+          //str[end_of_string] = (char) NANO_UNDER.read();
+          //str[end_of_string + 1] = NULL;
+          str += (char) NANO_UNDER.read();
       }
   }
 
   return str;
 }
 
+//rutina para mandar un mensaje de texto
+void sendLongSms(char* num, char* message){
+  //nuestro de buffer de envios tiene el máximo que podemos mandar por sms, 160 caracteres.
+  char buffer_envios[160];
+  buffer_envios[0] = NULL;
+  char datos_de_lectura[50];
+  strcat(datos_de_lectura, strtok(lecturas_nano_under, delimitador));
+  //datos_de_lectura = strtok(lecturas_nano_under, delimiter);
+  int i = 0;
+  while(datos_de_lectura && i < 12){
+    #if (SERIAL_DEBUG)
+      Serial.println(i);
+      Serial.print("datos de lectura : ");
+      Serial.println(datos_de_lectura);
+    #endif
+    if(strlen(datos_de_lectura) + strlen(buffer_envios) > 160){
+      #if (SERIAL_DEBUG)
+        Serial.print("SMS saliente : ");
+        Serial.println(buffer_envios);
+      #endif
+      sendSms(num, buffer_envios);
+      buffer_envios[0] = NULL;
+    }
+    strcat(buffer_envios, datos_de_lectura);
+    //strcat(buffer_envios, "\n");
+    #if (SERIAL_DEBUG)
+      Serial.print("buffer de envio : ");
+      Serial.println(buffer_envios);
+    #endif
+    datos_de_lectura[0] = NULL;
+    strcat(datos_de_lectura, strtok(NULL, delimitador));
+    //datos_de_lectura = strtok(NULL, delimiter);
+    i++;
+  }
+  sendSms(num, buffer_envios);
+}
 bool sendSms( String num, String msg){
   SIM800L.println("\r\n"); //limpiar antes de mandar cosas
   SIM800L.println ("AT+CMGF=1"); 	//set sms to text mode
@@ -130,7 +246,10 @@ bool sendSms( String num, String msg){
   
   SIM800L.write(26);
   delay(2000);
-  _buffer=_readSerial_timeout(60000);
+  _buffer[0] = NULL;
+  //strcat(_buffer, _readSerial_timeout(60000));
+  _readSerial_timeout(60000).toCharArray(_buffer, sizeof(_buffer));
+  //_buffer = _readSerial_timeout(60000);
   
   #if SERIAL_DEBUG
   Serial.println(_buffer);
@@ -138,34 +257,70 @@ bool sendSms( String num, String msg){
   
   // Serial.println(_buffer);
   //expect CMGS:xxx   , where xxx is a number,for the sending sms.
-  if ((_buffer.indexOf("ER")) != -1) {
+  if ((strstr(_buffer,"ER")) != NULL) {
       return true;
-  } else if ((_buffer.indexOf("CMGS")) != -1) {
+  } else if ((strstr(_buffer,"CMGS")) != NULL) {
       return false;
   } else {
     return true;
   }
+  //if ((_buffer.indexOf("ER")) != -1) {
+  //    return true;
+  //} else if ((_buffer.indexOf("CMGS")) != -1) {
+  //    return false;
+  //} else {
+  //  return true;
+  //}
   // Error found, return 1
   // Error NOT found, return 0
 }
 
-//setup al prenderse el dispositivo
-void setup() {
-  #if (SERIAL_DEBUG)
-  Serial.begin(BAUD_RATE);
-  Serial.println("Bienvenide al sistema de detección y comunicación");
+bool sendSms( String num, char* msg){
+  SIM800L.println("\r\n"); //limpiar antes de mandar cosas
+  SIM800L.println ("AT+CMGF=1"); 	//set sms to text mode
+  delay(100);
+  //_buffer=_readSerial();
+
+  SIM800L.println ("AT+CMGS=\"" + num + "\"");  	// command to send sms
+  //SIM800L.print (num);
+  //SIM800L.println("\"");
+  delay(100);
+  //_buffer=_readSerial();
+  
+  SIM800L.print (msg);
+  //SIM800L.print ("\r");
+  delay(100);
+  //_buffer=_readSerial();
+  
+  SIM800L.write(26);
+  delay(2000);
+  _buffer[0] = NULL;
+  //strcat(_buffer, _readSerial_timeout(60000));
+  _readSerial_timeout(60000).toCharArray(_buffer, sizeof(_buffer));
+  //_buffer = _readSerial_timeout(60000);
+  
+  #if SERIAL_DEBUG
+  Serial.println(_buffer);
   #endif
-
-  pinMode(RESET_PIN, OUTPUT);
-
-  SIM800L.begin(BAUD_RATE);
-
-  NANO_UNDER.begin(BAUD_RATE);
-  pinMode(INTR_NANO_UNDER_PIN, OUTPUT);
-
-  if (LED_FLAG) pinMode(LED_PIN, OUTPUT);
-
-  _buffer.reserve(BUFFER_RESERVE_MEMORY); // Reserve memory to prevent intern fragmention
+  
+  // Serial.println(_buffer);
+  //expect CMGS:xxx   , where xxx is a number,for the sending sms.
+  if ((strstr(_buffer,"ER")) != NULL) {
+      return true;
+  } else if ((strstr(_buffer,"CMGS")) != NULL) {
+      return false;
+  } else {
+    return true;
+  }
+  //if ((_buffer.indexOf("ER")) != -1) {
+  //    return true;
+  //} else if ((_buffer.indexOf("CMGS")) != -1) {
+  //    return false;
+  //} else {
+  //  return true;
+  //}
+  // Error found, return 1
+  // Error NOT found, return 0
 }
 
 //funciones para testear y mandar comandos desde la computadora directamente al Arduino
@@ -230,16 +385,15 @@ bool serial_parse(void) {
           }
           break;
         case 't':
-          digitalWrite(INTR_NANO_UNDER_PIN, LOW);
-          Serial.println("despertando al arduino under");
-          digitalWrite(INTR_NANO_UNDER_PIN, HIGH);
-          Serial.println("esperando para mensaje del nano under");
-          delay(2000);
-          Serial.println("leyendo mensaje del nano under");
-          _buffer = _readSerialUnder();
-          delay(100);
+          _buffer[0] = NULL;
+          //strcat(_buffer, _readSerialUnder());
+          _readSerialUnder().toCharArray(_buffer, sizeof(_buffer));
+          //_buffer = _readSerialUnder();
+          if(_buffer[0] == NULL){
+            Serial.println("buffer vacío");
+            break;
+          }
           Serial.println(_buffer);
-          digitalWrite(INTR_NANO_UNDER_PIN, LOW);
           break;
       }
     }
@@ -251,8 +405,3 @@ bool serial_parse(void) {
 }
 #endif
 
-void loop() {
-  #if (SERIAL_DEBUG)
-  serial_process();
-  #endif
-}
