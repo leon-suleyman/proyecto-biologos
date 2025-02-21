@@ -8,7 +8,6 @@
 // Pin definitions for your SIM800 module
 #define RX_PIN 10
 #define TX_PIN 11
-#define RESET_PIN 2
 #define BAUD_RATE 9600
 #define LED_FLAG	true 	// true: use led.	 false: don't user led.
 #define LED_PIN 	13 		// pin to indicate states.
@@ -35,28 +34,33 @@
 #define SERIAL_DBG(x)
 #endif
 
-// Software serial for communication with the GSM module
-/*SoftwareSerial SerialAT(RX_PIN, TX_PIN);
-TinyGsm modem(SerialAT);
-TinyGsmClient client(modem);
-*/
-//Sim800L Sim800L(RX_PIN, TX_PIN);
 bool error = false;
 char* num_tel = "+541156628833";
 
 SoftwareSerial SIM800L(RX_PIN, TX_PIN);
 SoftwareSerial NANO_UNDER(RX_NANO_UNDER_PIN, TX_NANO_UNDER_PIN);
+SoftwareSerial NANO_DEEPER(RX_NANO_DEEPER_PIN, TX_NANO_DEEPER_PIN);
 //String _buffer;
 char _buffer[64];
 
-char lecturas_nano_under[500];
-char lecturas_nano_deeper[500];
+//char lecturas_nano_under[500];
+//char lecturas_nano_deeper[500];
+char lecturas_nanos_sumergidos[912];
 int indice_lecturas_under = 0;
 int indice_lecturas_deeper = 0;
-//defino el delimitador para parsear las lecturas al enviarlas por SMS
-//char delimitador[] = "|";
+int indice_lecturas = 0;
 
+//Los estados del Arduino Nano que va a la superficie conectado al SIM800L
 enum : byte {IDLE, READ_UNDER, READ_DEEPER, SEND_SMS} estado = IDLE;
+/*
+  * IDLE : duerme esperando que le manden instrucciones de anotar datos, si hay 12 datos anotados de alguno de los demas Arduinos Nano, cambia a SEND_SMS_correspondiente
+  * READ_UNDER : lee la comunicación con el Arduino nano sumergido más cercano y anota la lectura que le dió. De haber sido la 12ava lectura. 
+  * READ_DEEPER : mismo que READ_UNDER pero comunicandose con el Arduino Nano sumergido más lejano. 
+  * SEND_SMS_[...] : manda un mensaje con las 12 lecturas dirarias del Arduino Nano [...].
+*/
+
+//flag que nos dice si mientras estabamos leyendo los datos de un Arduino, otro nos manda request de prestarle atención. 
+bool request_lectura_paralela = false;
 
 
 //setup al prenderse el dispositivo
@@ -66,12 +70,12 @@ void setup() {
   Serial.println("Bienvenide al sistema de detección y comunicación");
   #endif
 
-  pinMode(RESET_PIN, OUTPUT);
-
   SIM800L.begin(BAUD_RATE);
 
   NANO_UNDER.begin(BAUD_RATE);
   attachInterrupt(digitalPinToInterrupt(INTR_NANO_UNDER_PIN), interrupcionUnder, RISING);
+  NANO_DEEPER.begin(BAUD_RATE);
+  attachInterrupt(digitalPinToInterrupt(INTR_NANO_DEEPER_PIN), interrupcionDeeper, RISING);
 
   if (LED_FLAG) pinMode(LED_PIN, OUTPUT);
 
@@ -84,10 +88,11 @@ void loop() {
       #if (SERIAL_DEBUG)
       serial_process();
       #endif
-      if(indice_lecturas_under >= 12){
+      if(indice_lecturas_under >= 12 && indice_lecturas_deeper >= 12){
         estado = SEND_SMS;
       }
       break;
+
     case READ_UNDER:
       delay(100);
       //anulamos el buffer previo
@@ -97,14 +102,15 @@ void loop() {
       //si me llegó algo
       if(_buffer[0] != NULL){
         //guardo los datos y le aviso que llegaron
-        strcat(lecturas_nano_under, _buffer);
+        strcat(lecturas_nanos_sumergidos, "1;");
+        strcat(lecturas_nanos_sumergidos, _buffer);
         //strcat(lecturas_nano_under, delimitador);
         indice_lecturas_under++;
         NANO_UNDER.print("llegó");
         //imprimo en pantalla si estamos en modo debug
         #if (SERIAL_DEBUG)
         Serial.print("\"");
-        Serial.print(lecturas_nano_under);
+        Serial.print(lecturas_nanos_sumergidos);
         Serial.print("\"");
         Serial.println(indice_lecturas_under);
         #endif
@@ -113,30 +119,85 @@ void loop() {
         Serial.println("Error con la llegada de datos");
         #endif
       }
-      estado = IDLE;
+      //talvez agregar mutex?
+      if(request_lectura_paralela){
+        estado = READ_DEEPER;
+        request_lectura_paralela = false;
+      }else{
+        estado = IDLE;
+      }
       break;
+    
+    case READ_DEEPER:
+      delay(100);
+      //anulamos el buffer previo
+      _buffer[0] = NULL;
+      //leo el buffer de la comunicación
+      _readSerialDeeper().toCharArray(_buffer, sizeof(_buffer));
+      //si me llegó algo
+      if(_buffer[0] != NULL){
+        //guardo los datos y le aviso que llegaron
+        strcat(lecturas_nanos_sumergidos, "2;");
+        strcat(lecturas_nanos_sumergidos, _buffer);
+        indice_lecturas_deeper++;
+        NANO_DEEPER.print("llegó");
+        //imprimo en pantalla si estamos en modo debug
+        #if (SERIAL_DEBUG)
+        Serial.print("\"");
+        Serial.print(lecturas_nanos_sumergidos);
+        Serial.print("\"");
+        Serial.println(indice_lecturas_deeper);
+        #endif
+      }else{
+        #if (SERIAL_DEBUG)
+        Serial.println("Error con la llegada de datos");
+        #endif
+      }
+      //añadir mutex talvez?
+      if(request_lectura_paralela){
+        estado = READ_UNDER;
+        request_lectura_paralela = false;
+      }else{
+        estado = IDLE;
+      }
+      break;
+    
 
     case SEND_SMS:
       #if (SERIAL_DEBUG)
       Serial.println("Por enviar datos por SMS");
       #endif
-      sendLongSms(num_tel, lecturas_nano_under);
+      sendLongSms(num_tel, lecturas_nanos_sumergidos);
       #if (SERIAL_DEBUG)
       Serial.println("Datos enviados por SMS");
       #endif
-      lecturas_nano_under[0] = NULL;
+      lecturas_nanos_sumergidos[0] = NULL;
       indice_lecturas_under = 0;
       estado = IDLE;
       break;
+    
   }
 }
 
 //Interrupciones
+//agregar mutex ?
 void interrupcionUnder(){
-  estado = READ_UNDER;
+  if(estado == IDLE){
+    estado = READ_UNDER;
+  }else{
+    request_lectura_paralela = true;
+  }
+}
+void interrupcionDeeper(){
+  if(estado == IDLE){
+    estado = READ_DEEPER;
+  }else{
+    request_lectura_paralela = true;
+  }
 }
 
 //lectura serial
+//quiero probar hacer una función sola de serial y simplemente pasarle como parametro el SoftwareSerial
 String _readSerialUnder(){
   uint64_t timeOld = millis();
 
@@ -150,6 +211,30 @@ String _readSerialUnder(){
   while(NANO_UNDER.available())
   {
       if (NANO_UNDER.available()>0)
+      { 
+          //int end_of_string = strlen(str);
+          //str[end_of_string] = (char) NANO_UNDER.read();
+          //str[end_of_string + 1] = NULL;
+          str += (char) NANO_UNDER.read();
+      }
+  }
+
+  return str;
+}
+
+String _readSerialDeeper(){
+  uint64_t timeOld = millis();
+
+  while (!NANO_DEEPER.available() && !(millis() > timeOld + TIME_OUT_READ_SERIAL))
+  {
+      delay(13);
+  }
+
+  String str = "";
+
+  while(NANO_DEEPER.available())
+  {
+      if (NANO_DEEPER.available()>0)
       { 
           //int end_of_string = strlen(str);
           //str[end_of_string] = (char) NANO_UNDER.read();
@@ -190,7 +275,7 @@ void sendLongSms(char* num, char* message){
   //nuestro de buffer de envios tiene el máximo que podemos mandar por sms, 160 caracteres.
   char buffer_envios[160];
   buffer_envios[0] = NULL;
-  char datos_de_lectura[50];
+  char datos_de_lectura[40];
   datos_de_lectura[0] = NULL;
   char caracter;
   int i = 0;
@@ -279,13 +364,6 @@ bool sendSms( String num, String msg){
   } else {
     return true;
   }
-  //if ((_buffer.indexOf("ER")) != -1) {
-  //    return true;
-  //} else if ((_buffer.indexOf("CMGS")) != -1) {
-  //    return false;
-  //} else {
-  //  return true;
-  //}
   // Error found, return 1
   // Error NOT found, return 0
 }
@@ -327,13 +405,6 @@ bool sendSms( String num, char* msg){
   } else {
     return true;
   }
-  //if ((_buffer.indexOf("ER")) != -1) {
-  //    return true;
-  //} else if ((_buffer.indexOf("CMGS")) != -1) {
-  //    return false;
-  //} else {
-  //  return true;
-  //}
   // Error found, return 1
   // Error NOT found, return 0
 }
@@ -400,15 +471,16 @@ bool serial_parse(void) {
           }
           break;
         case 't':
-          for(int i = 0; i<12; i++){
-            strcat(lecturas_nano_under, "2025");
-            strcat(lecturas_nano_under, "/");
-            strcat(lecturas_nano_under, "02");
-            strcat(lecturas_nano_under,"/");
-            strcat(lecturas_nano_under,"18 00:00:00;0000;0000;-000");
-            strcat(lecturas_nano_under, "\n");
+          for(int i = 0; i<24; i++){
+            strcat(lecturas_nanos_sumergidos, "1;");
+            strcat(lecturas_nanos_sumergidos, "2025");
+            strcat(lecturas_nanos_sumergidos, "/");
+            strcat(lecturas_nanos_sumergidos, "02");
+            strcat(lecturas_nanos_sumergidos,"/");
+            strcat(lecturas_nanos_sumergidos,"18 00:00:00;0000;0000;-000");
+            strcat(lecturas_nanos_sumergidos, "\n");
           }
-          sendLongSms(num_tel, lecturas_nano_under);
+          sendLongSms(num_tel, lecturas_nanos_sumergidos);
 
           break;
       }
