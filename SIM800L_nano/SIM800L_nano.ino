@@ -368,35 +368,32 @@ bool sendSms( String num, String msg){
   // Error NOT found, return 0
 }
 
+bool putSim800LToSleep(){
+  SIM800L.println("\r\n"); //limpiar antes de mandar cosas
+  SIM800L.println (“AT+CSCLK=1”); 	//set sms to sleep mode
+  delay(100);
+}
+
 bool sendSms( String num, char* msg){
   SIM800L.println("\r\n"); //limpiar antes de mandar cosas
   SIM800L.println ("AT+CMGF=1"); 	//set sms to text mode
   delay(100);
-  //_buffer=_readSerial();
 
   SIM800L.println ("AT+CMGS=\"" + num + "\"");  	// command to send sms
-  //SIM800L.print (num);
-  //SIM800L.println("\"");
   delay(100);
-  //_buffer=_readSerial();
   
   SIM800L.print (msg);
-  //SIM800L.print ("\r");
   delay(100);
-  //_buffer=_readSerial();
   
   SIM800L.write(26);
   delay(2000);
   _buffer[0] = NULL;
-  //strcat(_buffer, _readSerial_timeout(60000));
   _readSerial_timeout(60000).toCharArray(_buffer, sizeof(_buffer));
-  //_buffer = _readSerial_timeout(60000);
   
   #if SERIAL_DEBUG
   Serial.println(_buffer);
   #endif
   
-  // Serial.println(_buffer);
   //expect CMGS:xxx   , where xxx is a number,for the sending sms.
   if ((strstr(_buffer,"ER")) != NULL) {
       return true;
