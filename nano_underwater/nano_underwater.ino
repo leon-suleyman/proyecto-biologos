@@ -137,16 +137,43 @@ void loop()
   int timeOld = millis();
   while(!recibido && (millis() <= timeOld + 5000)){
     //armo el string que voy a pasarle al nano_sim
+    /*
+    char lectura_txt[40];
+    lectura_txt[0] = NULL;
+    strcat(lectura_txt, intToCString(now.year()) );
+    strcat(lectura_txt, "/" );
+    strcat(lectura_txt, intToCString(now.month()) );
+    strcat(lectura_txt, "/" );
+    strcat(lectura_txt, intToCString(now.day()) );
+    strcat(lectura_txt, " " );
+    strcat(lectura_txt, intToCString(now.hour()) );
+    strcat(lectura_txt, ":" );
+    strcat(lectura_txt, intToCString(now.minute()) );
+    strcat(lectura_txt, ":" );
+    strcat(lectura_txt, intToCString(now.second()) );
+    strcat(lectura_txt, ";" );
+    strcat(lectura_txt, intToCString(fluoro) );
+    strcat(lectura_txt, ";" );
+    strcat(lectura_txt, intToCString(irradiancia) );
+    strcat(lectura_txt, ";" );
+    strcat(lectura_txt, intToCString(temperatura) );
+    strcat(lectura_txt, "\n" );
+    */
+    /*
     String lectura_txt = "";
     lectura_txt = lectura_txt + String(now.year()) + "/" + String(now.month()) + "/" + String(now.day()) + " " + String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second()) + ";";
     lectura_txt = lectura_txt + String(fluoro) + ";" + String(irradiancia) + ";" + String(temperatura);
     lectura_txt = lectura_txt + "\n";
+    */
     //se lo paso por software serial
+    /*
+    Serial.print(lectura_txt);
     nano_sim.print(lectura_txt);
     delay(100);
     if(_readSerialSIM() == "llegó"){
       recibido = true;
     }
+    */
 
   digitalWrite(pin_interrupt_nano_sim, LOW);
 
@@ -168,7 +195,7 @@ asm volatile ("  jmp 0");
 }
 
 //lee la comunicación serial con el arduino nano con el sim800L
-String _readSerialSIM(){
+char* _readSerialSIM(){
   uint64_t timeOld = millis();
 
   while (!nano_sim.available() && !(millis() > timeOld + 5000))
@@ -176,17 +203,32 @@ String _readSerialSIM(){
       delay(13);
   }
 
-  String str;
+  char str[64];
+  str[0] = NULL;
 
   while(nano_sim.available())
   {
       if (nano_sim.available()>0)
       {
-          str += (char) nano_sim.read();
+          //str += (char) nano_sim.read();
+          char temp[2];
+          temp[1] = NULL;
+          temp[0] = (char) nano_sim.read();
+
+          strcat(str, temp);
       }
   }
 
   return str;
+}
+
+//aux
+char* intToCString(int x){
+  char buffer_int[5];
+  buffer_int[0] = NULL;
+
+  itoa(x, buffer_int, 10);
+  return buffer_int;
 }
 
 // Funcion sensores
