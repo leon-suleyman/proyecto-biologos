@@ -50,6 +50,7 @@ const uint8_t pin_rx_sim = 7;
 const uint8_t pin_tx_sim = 9;
 
 SoftwareSerial nano_sim(pin_rx_sim, pin_tx_sim);
+char buffer_int[5];
 
 
 Adafruit_ADS1115 ads;
@@ -135,6 +136,29 @@ void loop()
   int timeOld = millis();
   while(!recibido && (millis() <= timeOld + 5000)){
     //armo el string que voy a pasarle al nano_sim
+    
+    char lectura_txt[40];
+    lectura_txt[0] = NULL;
+    strcat(lectura_txt, intToCString(now.year()) );
+    strcat(lectura_txt, "/" );
+    strcat(lectura_txt, intToCString(now.month()) );
+    strcat(lectura_txt, "/" );
+    strcat(lectura_txt, intToCString(now.day()) );
+    strcat(lectura_txt, " " );
+    strcat(lectura_txt, intToCString(now.hour()) );
+    strcat(lectura_txt, ":" );
+    strcat(lectura_txt, intToCString(now.minute()) );
+    strcat(lectura_txt, ":" );
+    strcat(lectura_txt, intToCString(now.second()) );
+    strcat(lectura_txt, ";" );
+    strcat(lectura_txt, intToCString(fluoro) );
+    strcat(lectura_txt, ";" );
+    strcat(lectura_txt, intToCString(irradiancia) );
+    strcat(lectura_txt, ";" );
+    strcat(lectura_txt, intToCString(temperatura) );
+    strcat(lectura_txt, "\n" );
+    
+    /*
     String lectura_txt = "";
     lectura_txt = lectura_txt + String(now.year()) + "/" + String(now.month()) + "/" + String(now.day()) + " " + String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second()) + ";";
     lectura_txt = lectura_txt + String(fluoro) + ";" + String(irradiancia) + ";" + String(temperatura);
@@ -145,12 +169,15 @@ void loop()
     if(_readSerialSIM() == "llegó"){
       recibido = true;
     }
+    */
+    recibido = true;
+    Serial.print(lectura_txt);
 
-  digitalWrite(pin_interrupt_nano_sim, LOW);
+    digitalWrite(pin_interrupt_nano_sim, LOW);
 
   }
   
-  delay(3000); // 60 segundos (TIEMPO de delay LOOP)
+  delay(1000); // 60 segundos (TIEMPO de delay LOOP)
 
   software_Reset();
 
@@ -165,6 +192,7 @@ asm volatile ("  jmp 0");
 }
 
 //lee la comunicación serial con el arduino nano con el sim800L
+/*
 String _readSerialSIM(){
   uint64_t timeOld = millis();
 
@@ -184,6 +212,42 @@ String _readSerialSIM(){
   }
 
   return str;
+}
+*/
+
+char* _readSerialSIM(){
+  uint64_t timeOld = millis();
+
+  while (!nano_sim.available() && !(millis() > timeOld + 5000))
+  {
+      delay(13);
+  }
+
+  char str[64];
+  str[0] = NULL;
+
+  while(nano_sim.available())
+  {
+      if (nano_sim.available()>0)
+      {
+          //str += (char) nano_sim.read();
+          char temp[2];
+          temp[1] = NULL;
+          temp[0] = (char) nano_sim.read();
+
+          strcat(str, temp);
+      }
+  }
+
+  return str;
+}
+
+//aux
+char* intToCString(int x){
+  buffer_int[0] = NULL;
+
+  itoa(x, buffer_int, 10);
+  return buffer_int;
 }
 
 // Funcion sensores
