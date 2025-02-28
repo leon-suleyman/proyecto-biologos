@@ -21,15 +21,11 @@
 //AD2 es el BPW34 turbidez (OBS: no hay conexión para este en la placa que armamos con Leo)
 
 
-#include <SPI.h>              // Include SPI library (needed for the SD card)
-#include <SD.h>               // Include SD library
 #include <OneWire.h>               // Incluir promagra OneWire lectura
 #include <DallasTemperature.h>   // Incluir programa DallaTemperature lectura
 #include <Adafruit_ADS1X15.h>  // incluye libreria conversor ADS1115
 #include <Wire.h>   // incluye libreria para lector temperatura DS18B20
-#include "SD.h"    //incluye libreria para modulo tarjeta SD
 #include <RTClib.h>   // incluye libreria para el manejo del modulo RTC DS3231
-#include <SPI.h>
 #include <SoftwareSerial.h>
 
 
