@@ -45,11 +45,12 @@ DallasTemperature sensor(&oneWireBus);
 
 
 
-#define PIN_DATOS_DQ 2                         // Pin donde se conecta el bus l-wire
-#define PIN_LED 6 //led fluo
-#define PIN_INTRPT_NANO_SIM 3
-#define PIN_RX_SIM 7
-#define PIN_TX_SIM 9
+#define PIN_DATOS_DQ 2                          // Pin donde se conecta el bus l-wire
+#define PIN_LED 6                               //led fluo
+#define PIN_INTRPT_NANO_SIM 3                   //pin por donde se manda la interrupción al arduino nano que tiene la SIM800L
+#define PIN_RX_SIM 7                            //pin de RX con el arduino sim
+#define PIN_TX_SIM 9                            //pin de TX con el arduino sim
+
 
 SoftwareSerial nano_sim(PIN_RX_SIM, PIN_TX_SIM);
 char buffer_int[5];
@@ -61,6 +62,7 @@ const float multiplier = 0.1875F;
 // RTC_DS1307 rtc;
 RTC_DS3231 rtc;
 
+const uint8_t this_nano_id = 0;                    //ID para el nano con sensores. Habría que cambiar para cada uno.
 
 void setup()
 {
@@ -150,6 +152,8 @@ void loop()
     
     char lectura_txt[40];
     lectura_txt[0] = NULL;
+    strcat(lectura_txt, intToCString(this_nano_id));
+    strcat(lectura_txt, ";" );
     strcat(lectura_txt, intToCString(now.year()) );
     strcat(lectura_txt, "/" );
     strcat(lectura_txt, intToCString(now.month()) );
@@ -169,21 +173,19 @@ void loop()
     strcat(lectura_txt, intToCString(temperatura) );
     strcat(lectura_txt, "\n" );
     
-    /*
     //se lo paso por software serial
     nano_sim.print(lectura_txt);
     delay(100);
-    if(_readSerialSIM() == "llegó"){
+    //if(_readSerialSIM() == "llegó"){
       recibido = true;
-    }
-    */
-    recibido = true;
+    //}
+
     Serial.print(lectura_txt);
 
     digitalWrite(PIN_INTRPT_NANO_SIM, LOW);
 
     //anotamos en la tarjeta SD la lectura
-    char filename[20];
+    char filename[22];
     filename[0] = NULL;
     strcat(filename, "data_");
     strcat(filename, intToCString(now.year()));
@@ -193,9 +195,17 @@ void loop()
     strcat(filename, intToCString(now.day()));
     strcat(filename, ".csv");
 
+    bool no_existe_previamente = true;
+    if(SD.exists(filename)){
+      no_existe_previamente = false;
+    }
+
     datos_actuales = SD.open(filename, FILE_WRITE);
     if (datos_actuales) {
-      Serial.print("Writing to test.txt...");
+      Serial.print("Writing data...");
+      if(no_existe_previamente){
+        datos_actuales.println("ID;DateTime;fluoro;irradiancia;temperatura");
+      }
       datos_actuales.print(lectura_txt);
       // close the file:
       datos_actuales.close();
@@ -275,8 +285,15 @@ char* _readSerialSIM(){
 //aux
 char* intToCString(int x){
   buffer_int[0] = NULL;
+  char buff_buffer[5];
+  buff_buffer[0] = NULL;
+  if(x < 0){
+    strcat(buff_buffer, "-");
+  }
 
-  itoa(x, buffer_int, 10);
+  itoa(x, buff_buffer, 10);
+
+  strcat(buffer_int, buff_buffer);
   return buffer_int;
 }
 
