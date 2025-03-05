@@ -28,6 +28,12 @@
 #include <RTClib.h>   // incluye libreria para el manejo del modulo RTC DS3231
 #include <SoftwareSerial.h>
 
+#include <SPI.h>
+#include <SdFat.h>
+//#include "SdFat.h"
+SdFat SD;
+File datos_actuales;
+
 
 const uint8_t oneWirePin = 2; //sensor dallas
 
@@ -39,13 +45,13 @@ DallasTemperature sensor(&oneWireBus);
 
 
 
-const uint8_t pinDatosDQ = 2;                         // Pin donde se conecta el bus l-wire
-const uint8_t pinLed = 6; //led fluo
-const uint8_t pin_interrupt_nano_sim = 3;
-const uint8_t pin_rx_sim = 7;
-const uint8_t pin_tx_sim = 9;
+#define PIN_DATOS_DQ 2                         // Pin donde se conecta el bus l-wire
+#define PIN_LED 6 //led fluo
+#define PIN_INTRPT_NANO_SIM 3
+#define PIN_RX_SIM 7
+#define PIN_TX_SIM 9
 
-SoftwareSerial nano_sim(pin_rx_sim, pin_tx_sim);
+SoftwareSerial nano_sim(PIN_RX_SIM, PIN_TX_SIM);
 char buffer_int[5];
 
 
@@ -78,13 +84,22 @@ void setup()
     nano_sim.begin(9600);
     //nano_sim.println("Buen día!");
 
-    pinMode(pinLed, OUTPUT); // pin LED en output fluorom
-    pinMode(pin_interrupt_nano_sim, OUTPUT);
+    pinMode(PIN_LED, OUTPUT); // pin LED en output fluorom
+    pinMode(PIN_INTRPT_NANO_SIM, OUTPUT);
 
-    digitalWrite(6, LOW);
-    digitalWrite(pin_interrupt_nano_sim, LOW);
+    digitalWrite(PIN_LED, LOW);
+    digitalWrite(PIN_INTRPT_NANO_SIM, LOW);
 
     Serial.println("Completado");
+
+    //inicialización de la tarejta SD
+    Serial.print("Initializing SD card...");
+
+    if (!SD.begin(SSpin)) {
+      Serial.println("initialization failed!");
+      return;
+    }
+    Serial.println("initialization done.");
  
   }
 
@@ -113,21 +128,21 @@ void loop()
   //primero que nada consigo fecha y hora para usar.
   DateTime now = rtc.now();
 
-  digitalWrite(6, HIGH);
+  digitalWrite(PIN_LED, HIGH);
   //delay(120000); //2 min para el led
 
 // lee Fluorescencia
-  int fluoro = readSensorFluoro();
+  int16_t fluoro = readSensorFluoro();
 
 // lee irradiancia
-  int irradiancia = readSensorIrradiancia();
+  int16_t irradiancia = readSensorIrradiancia();
 
 // lee temperatura:
-  int temperatura = readSensorTemperatura();
+  int16_t temperatura = readSensorTemperatura();
 
-  digitalWrite(6, LOW);
+  digitalWrite(PIN_LED, LOW);
   //mando interrupción al nano SIM para que me escuche los datos que mando;
-  digitalWrite(pin_interrupt_nano_sim, HIGH);
+  digitalWrite(PIN_INTRPT_NANO_SIM, HIGH);
   bool recibido = false;
   int timeOld = millis();
   while(!recibido && (millis() <= timeOld + 5000)){
@@ -155,10 +170,6 @@ void loop()
     strcat(lectura_txt, "\n" );
     
     /*
-    String lectura_txt = "";
-    lectura_txt = lectura_txt + String(now.year()) + "/" + String(now.month()) + "/" + String(now.day()) + " " + String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second()) + ";";
-    lectura_txt = lectura_txt + String(fluoro) + ";" + String(irradiancia) + ";" + String(temperatura);
-    lectura_txt = lectura_txt + "\n";
     //se lo paso por software serial
     nano_sim.print(lectura_txt);
     delay(100);
@@ -169,7 +180,30 @@ void loop()
     recibido = true;
     Serial.print(lectura_txt);
 
-    digitalWrite(pin_interrupt_nano_sim, LOW);
+    digitalWrite(PIN_INTRPT_NANO_SIM, LOW);
+
+    //anotamos en la tarjeta SD la lectura
+    char filename[20];
+    filename[0] = NULL;
+    strcat(filename, "data_");
+    strcat(filename, intToCString(now.year()));
+    strcat(filename, "_");
+    strcat(filename, intToCString(now.month()));
+    strcat(filename, "_");
+    strcat(filename, intToCString(now.day()));
+    strcat(filename, ".csv");
+
+    datos_actuales = SD.open(filename, FILE_WRITE);
+    if (datos_actuales) {
+      Serial.print("Writing to test.txt...");
+      datos_actuales.print(lectura_txt);
+      // close the file:
+      datos_actuales.close();
+      Serial.println("done.");
+    } else {
+      // if the file didn't open, print an error:
+      Serial.println("error opening file");
+    }
 
   }
   
