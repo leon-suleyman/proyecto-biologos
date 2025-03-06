@@ -102,7 +102,6 @@ void loop() {
       //si me llegó algo
       if(_buffer[0] != NULL){
         //guardo los datos y le aviso que llegaron
-        strcat(lecturas_nanos_sumergidos, "1;");
         strcat(lecturas_nanos_sumergidos, _buffer);
         //strcat(lecturas_nano_under, delimitador);
         indice_lecturas_under++;
@@ -137,7 +136,6 @@ void loop() {
       //si me llegó algo
       if(_buffer[0] != NULL){
         //guardo los datos y le aviso que llegaron
-        strcat(lecturas_nanos_sumergidos, "2;");
         strcat(lecturas_nanos_sumergidos, _buffer);
         indice_lecturas_deeper++;
         NANO_DEEPER.print("llegó");
@@ -153,7 +151,7 @@ void loop() {
         Serial.println("Error con la llegada de datos");
         #endif
       }
-      //añadir mutex talvez?
+
       if(request_lectura_paralela){
         estado = READ_UNDER;
         request_lectura_paralela = false;
@@ -291,12 +289,6 @@ void sendLongSms(char* num, char* message){
 
     //si es un end of line, tenemos una lectura completa en datos_de_lectura y podemos agregarla al mensaje
     if(caracter == '\n'){
-      /*
-      #if (SERIAL_DEBUG)
-        Serial.print("datos de lectura : ");
-        Serial.println(datos_de_lectura);
-      #endif
-      */
       //si el mensaje se excede al agregar, entonces lo enviamos  y despues lo agregamos
       if(strlen(datos_de_lectura) < 160 && strlen(datos_de_lectura) + strlen(buffer_envios) >= 160){
         #if (SERIAL_DEBUG)
@@ -308,12 +300,6 @@ void sendLongSms(char* num, char* message){
       }
       strcat(buffer_envios, datos_de_lectura);
       //strcat(buffer_envios, "\n");
-      /*
-      #if (SERIAL_DEBUG)
-        Serial.print("buffer de envio : ");
-        Serial.println(buffer_envios);
-      #endif
-      */
       datos_de_lectura[0] = NULL;
       indice_fin_string = 0;
     }
@@ -368,9 +354,15 @@ bool sendSms( String num, String msg){
   // Error NOT found, return 0
 }
 
-bool putSim800LToSleep(){
+bool putSim800LToLowPower(){
   SIM800L.println("\r\n"); //limpiar antes de mandar cosas
-  SIM800L.println (“AT+CSCLK=1”); 	//set sms to sleep mode
+  SIM800L.println("AT+CFUN=0");
+  delay(100);
+}
+
+bool putSim800LToNormal(){
+  SIM800L.println("\r\n"); //limpiar antes de mandar cosas
+  SIM800L.println("AT+CFUN=1");
   delay(100);
 }
 

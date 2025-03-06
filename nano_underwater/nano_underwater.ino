@@ -147,76 +147,76 @@ void loop()
   digitalWrite(PIN_INTRPT_NANO_SIM, HIGH);
   bool recibido = false;
   int timeOld = millis();
+  char lectura_txt[40];
+  lectura_txt[0] = NULL;
+  
+  //armo el string que voy a pasarle al nano_sim
+  strcat(lectura_txt, intToCString(this_nano_id));
+  strcat(lectura_txt, ";" );
+  strcat(lectura_txt, intToCString(now.year()) );
+  strcat(lectura_txt, "/" );
+  strcat(lectura_txt, intToCString(now.month()) );
+  strcat(lectura_txt, "/" );
+  strcat(lectura_txt, intToCString(now.day()) );
+  strcat(lectura_txt, " " );
+  strcat(lectura_txt, intToCString(now.hour()) );
+  strcat(lectura_txt, ":" );
+  strcat(lectura_txt, intToCString(now.minute()) );
+  strcat(lectura_txt, ":" );
+  strcat(lectura_txt, intToCString(now.second()) );
+  strcat(lectura_txt, ";" );
+  strcat(lectura_txt, intToCString(fluoro) );
+  strcat(lectura_txt, ";" );
+  strcat(lectura_txt, intToCString(irradiancia) );
+  strcat(lectura_txt, ";" );
+  strcat(lectura_txt, intToCString(temperatura) );
+  strcat(lectura_txt, "\n" );
+
   while(!recibido && (millis() <= timeOld + 5000)){
-    //armo el string que voy a pasarle al nano_sim
-    
-    char lectura_txt[40];
-    lectura_txt[0] = NULL;
-    strcat(lectura_txt, intToCString(this_nano_id));
-    strcat(lectura_txt, ";" );
-    strcat(lectura_txt, intToCString(now.year()) );
-    strcat(lectura_txt, "/" );
-    strcat(lectura_txt, intToCString(now.month()) );
-    strcat(lectura_txt, "/" );
-    strcat(lectura_txt, intToCString(now.day()) );
-    strcat(lectura_txt, " " );
-    strcat(lectura_txt, intToCString(now.hour()) );
-    strcat(lectura_txt, ":" );
-    strcat(lectura_txt, intToCString(now.minute()) );
-    strcat(lectura_txt, ":" );
-    strcat(lectura_txt, intToCString(now.second()) );
-    strcat(lectura_txt, ";" );
-    strcat(lectura_txt, intToCString(fluoro) );
-    strcat(lectura_txt, ";" );
-    strcat(lectura_txt, intToCString(irradiancia) );
-    strcat(lectura_txt, ";" );
-    strcat(lectura_txt, intToCString(temperatura) );
-    strcat(lectura_txt, "\n" );
-    
     //se lo paso por software serial
     nano_sim.print(lectura_txt);
     delay(100);
-    //if(_readSerialSIM() == "llegó"){
+    if(_readSerialSIM() == "llegó"){
       recibido = true;
-    //}
-
-    Serial.print(lectura_txt);
-
-    digitalWrite(PIN_INTRPT_NANO_SIM, LOW);
-
-    //anotamos en la tarjeta SD la lectura
-    char filename[22];
-    filename[0] = NULL;
-    strcat(filename, "data_");
-    strcat(filename, intToCString(now.year()));
-    strcat(filename, "_");
-    strcat(filename, intToCString(now.month()));
-    strcat(filename, "_");
-    strcat(filename, intToCString(now.day()));
-    strcat(filename, ".csv");
-
-    bool no_existe_previamente = true;
-    if(SD.exists(filename)){
-      no_existe_previamente = false;
+    }else{
+      delay(500);
     }
-
-    datos_actuales = SD.open(filename, FILE_WRITE);
-    if (datos_actuales) {
-      Serial.print("Writing data...");
-      if(no_existe_previamente){
-        datos_actuales.println("ID;DateTime;fluoro;irradiancia;temperatura");
-      }
-      datos_actuales.print(lectura_txt);
-      // close the file:
-      datos_actuales.close();
-      Serial.println("done.");
-    } else {
-      // if the file didn't open, print an error:
-      Serial.println("error opening file");
-    }
-
   }
   
+  Serial.print(lectura_txt);
+
+  digitalWrite(PIN_INTRPT_NANO_SIM, LOW);
+
+  //anotamos en la tarjeta SD la lectura
+  char filename[22];
+  filename[0] = NULL;
+  strcat(filename, "data_");
+  strcat(filename, intToCString(now.year()));
+  strcat(filename, "_");
+  strcat(filename, intToCString(now.month()));
+  strcat(filename, "_");
+  strcat(filename, intToCString(now.day()));
+  strcat(filename, ".csv");
+
+  bool no_existe_previamente = true;
+  if(SD.exists(filename)){
+    no_existe_previamente = false;
+  }
+
+  datos_actuales = SD.open(filename, FILE_WRITE);
+  if (datos_actuales) {
+    Serial.print("Writing data...");
+    if(no_existe_previamente){
+      datos_actuales.println("ID;DateTime;fluoro;irradiancia;temperatura");
+    }
+    datos_actuales.print(lectura_txt);
+    // close the file:
+    datos_actuales.close();
+    Serial.println("done.");
+  } else {
+    // if the file didn't open, print an error:
+    Serial.println("error opening file");
+  }
   delay(1000); // 60 segundos (TIEMPO de delay LOOP)
 
   software_Reset();
