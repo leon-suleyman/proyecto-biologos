@@ -217,7 +217,7 @@ void loop()
     // if the file didn't open, print an error:
     Serial.println("error opening file");
   }
-  delay(1000); // 60 segundos (TIEMPO de delay LOOP)
+  delay(5000); // 60 segundos (TIEMPO de delay LOOP)
 
   software_Reset();
 

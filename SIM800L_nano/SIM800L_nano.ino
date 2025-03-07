@@ -88,12 +88,18 @@ void loop() {
       #if (SERIAL_DEBUG)
       serial_process();
       #endif
-      if(indice_lecturas_under >= 12 && indice_lecturas_deeper >= 12){
-        estado = SEND_SMS;
+      if(indice_lecturas >= 24){
+        //estado = SEND_SMS;
+        #if (SERIAL_DEBUG)
+        Serial.println("Aca se deberían enviar los mensajes");
+        #endif
       }
       break;
 
     case READ_UNDER:
+      #if (SERIAL_DEBUG)
+      Serial.println("vamos a leer los datso del nano under");
+      #endif
       delay(100);
       //anulamos el buffer previo
       _buffer[0] = NULL;
@@ -115,11 +121,14 @@ void loop() {
         #endif
       }else{
         #if (SERIAL_DEBUG)
-        Serial.println("Error con la llegada de datos");
+        Serial.println("Error con la llegada de datos del under");
         #endif
       }
       //talvez agregar mutex?
       if(request_lectura_paralela){
+        #if (SERIAL_DEBUG)
+        Serial.println("hubo lectura paralela al leer el under");
+        #endif
         estado = READ_DEEPER;
         request_lectura_paralela = false;
       }else{
@@ -128,6 +137,9 @@ void loop() {
       break;
     
     case READ_DEEPER:
+      #if (SERIAL_DEBUG)
+      Serial.println("vamos a leer los datso del nano deeper");
+      #endif
       delay(100);
       //anulamos el buffer previo
       _buffer[0] = NULL;
@@ -148,11 +160,14 @@ void loop() {
         #endif
       }else{
         #if (SERIAL_DEBUG)
-        Serial.println("Error con la llegada de datos");
+        Serial.println("Error con la llegada de datos del deeper");
         #endif
       }
 
       if(request_lectura_paralela){
+        #if (SERIAL_DEBUG)
+        Serial.println("hubo lectura paralela al leer el deeper");
+        #endif
         estado = READ_UNDER;
         request_lectura_paralela = false;
       }else{
@@ -182,14 +197,14 @@ void loop() {
 void interrupcionUnder(){
   if(estado == IDLE){
     estado = READ_UNDER;
-  }else{
+  }else if(estado != READ_UNDER){
     request_lectura_paralela = true;
   }
 }
 void interrupcionDeeper(){
   if(estado == IDLE){
     estado = READ_DEEPER;
-  }else{
+  }else if(estado != READ_DEEPER){
     request_lectura_paralela = true;
   }
 }
