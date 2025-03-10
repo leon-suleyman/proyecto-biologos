@@ -46,9 +46,9 @@ char _buffer[40];
 //char lecturas_nano_under[500];
 //char lecturas_nano_deeper[500];
 char lecturas_nanos_sumergidos[912];
-int indice_lecturas_under = 0;
-int indice_lecturas_deeper = 0;
-int indice_lecturas = 0;
+uint8_t indice_lecturas_under = 0;
+uint8_t indice_lecturas_deeper = 0;
+uint8_t indice_lecturas = 0;
 
 //Los estados del Arduino Nano que va a la superficie conectado al SIM800L
 enum : byte {IDLE, READ_UNDER, READ_DEEPER, SEND_SMS} estado = IDLE;
