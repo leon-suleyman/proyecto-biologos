@@ -41,7 +41,7 @@ SoftwareSerial SIM800L(RX_PIN, TX_PIN);
 SoftwareSerial NANO_UNDER(RX_NANO_UNDER_PIN, TX_NANO_UNDER_PIN);
 SoftwareSerial NANO_DEEPER(RX_NANO_DEEPER_PIN, TX_NANO_DEEPER_PIN);
 //String _buffer;
-char _buffer[64];
+char _buffer[40];
 
 //char lecturas_nano_under[500];
 //char lecturas_nano_deeper[500];
@@ -104,7 +104,9 @@ void loop() {
       //anulamos el buffer previo
       _buffer[0] = NULL;
       //leo el buffer de la comunicación
-      _readSerialUnder().toCharArray(_buffer, sizeof(_buffer));
+      //_readSerial(NANO_UNDER).toCharArray(_buffer, sizeof(_buffer));
+      //strcat(_buffer, _readSerial(NANO_UNDER));
+      _readSerial(NANO_UNDER, TIME_OUT_READ_SERIAL);
       //si me llegó algo
       if(_buffer[0] != NULL){
         //guardo los datos y le aviso que llegaron
@@ -125,26 +127,27 @@ void loop() {
         #endif
       }
       //talvez agregar mutex?
+      estado = IDLE;
       if(request_lectura_paralela){
         #if (SERIAL_DEBUG)
         Serial.println("hubo lectura paralela al leer el under");
         #endif
         estado = READ_DEEPER;
         request_lectura_paralela = false;
-      }else{
-        estado = IDLE;
       }
       break;
     
     case READ_DEEPER:
       #if (SERIAL_DEBUG)
-      Serial.println("vamos a leer los datso del nano deeper");
+      Serial.println("vamos a leer los datos del nano deeper");
       #endif
       delay(100);
       //anulamos el buffer previo
       _buffer[0] = NULL;
       //leo el buffer de la comunicación
-      _readSerialDeeper().toCharArray(_buffer, sizeof(_buffer));
+      //_readSerial(NANO_DEEPER).toCharArray(_buffer, sizeof(_buffer));
+      //strcat(_buffer, _readSerial(NANO_DEEPER));
+      _readSerial(NANO_DEEPER, TIME_OUT_READ_SERIAL);
       //si me llegó algo
       if(_buffer[0] != NULL){
         //guardo los datos y le aviso que llegaron
@@ -164,15 +167,15 @@ void loop() {
         #endif
       }
 
+      estado = IDLE;
       if(request_lectura_paralela){
         #if (SERIAL_DEBUG)
         Serial.println("hubo lectura paralela al leer el deeper");
         #endif
         estado = READ_UNDER;
         request_lectura_paralela = false;
-      }else{
-        estado = IDLE;
       }
+
       break;
     
 
@@ -211,7 +214,39 @@ void interrupcionDeeper(){
 
 //lectura serial
 //quiero probar hacer una función sola de serial y simplemente pasarle como parametro el SoftwareSerial
-String _readSerialUnder(){
+
+//char* _readSerial(SoftwareSerial sw){
+void _readSerial(SoftwareSerial sw, int timeout){
+  uint64_t timeOld = millis();
+
+  while (!sw.available() && !(millis() > timeOld + timeout))
+  {
+      delay(13);
+  }
+
+  _buffer[0] = NULL;
+
+  while(sw.available())
+  {
+      if (sw.available()>0)
+      { 
+        char temp[2];
+        temp[1] = NULL;
+        temp[0] = (char) sw.read();
+        strcat(_buffer, temp);
+        //_buffer += (char) sw.read();
+      }
+  }
+
+  #if (SERIAL_DEBUG)
+  Serial.print("datos leidos de la comunicación: ");
+  Serial.print(_buffer);
+  #endif
+
+  //return str;
+}
+/*
+char* _readSerialUnder(){
   uint64_t timeOld = millis();
 
   while (!NANO_UNDER.available() && !(millis() > timeOld + TIME_OUT_READ_SERIAL))
@@ -219,23 +254,29 @@ String _readSerialUnder(){
       delay(13);
   }
 
-  String str = "";
+  char str[64];
+  str[0] = NULL;
 
   while(NANO_UNDER.available())
   {
       if (NANO_UNDER.available()>0)
       { 
-          //int end_of_string = strlen(str);
-          //str[end_of_string] = (char) NANO_UNDER.read();
-          //str[end_of_string + 1] = NULL;
-          str += (char) NANO_UNDER.read();
+          char temp[2];
+          temp[1] = NULL;
+          temp[0] = (char) NANO_UNDER.read();
+          strcat(str, temp);
+          //str += (char) NANO_UNDER.read();
       }
   }
-
+  
+  #if (SERIAL_DEBUG)
+  Serial.print("datos leidos de la comunicación con el Nano Under : ");
+  Serial.print(str);
+  #endif
   return str;
 }
 
-String _readSerialDeeper(){
+char* _readSerialDeeper(){
   uint64_t timeOld = millis();
 
   while (!NANO_DEEPER.available() && !(millis() > timeOld + TIME_OUT_READ_SERIAL))
@@ -243,18 +284,25 @@ String _readSerialDeeper(){
       delay(13);
   }
 
-  String str = "";
+  char str[64];
+  str[0] = NULL;
 
   while(NANO_DEEPER.available())
   {
       if (NANO_DEEPER.available()>0)
       { 
-          //int end_of_string = strlen(str);
-          //str[end_of_string] = (char) NANO_UNDER.read();
-          //str[end_of_string + 1] = NULL;
-          str += (char) NANO_UNDER.read();
+        char temp[2];
+        temp[1] = NULL;
+        temp[0] = (char) NANO_DEEPER.read();
+        strcat(str, temp);
+        //str += (char) NANO_DEEPER.read();
       }
   }
+
+  #if (SERIAL_DEBUG)
+  Serial.print("datos leidos de la comunicación con el Nano Deeper : ");
+  Serial.print(str);
+  #endif
 
   return str;
 }
@@ -282,6 +330,7 @@ String _readSerial_timeout(int timeout){
 
   return str;
 }
+*/
 
 //rutina para mandar un mensaje de texto
 void sendLongSms(char* num, char* message){
@@ -349,8 +398,9 @@ bool sendSms( String num, String msg){
   delay(2000);
   _buffer[0] = NULL;
   //strcat(_buffer, _readSerial_timeout(60000));
-  _readSerial_timeout(60000).toCharArray(_buffer, sizeof(_buffer));
+  //_readSerial_timeout(60000).toCharArray(_buffer, sizeof(_buffer));
   //_buffer = _readSerial_timeout(60000);
+  _readSerial(SIM800L, 60000);
   
   #if SERIAL_DEBUG
   Serial.println(_buffer);
@@ -395,7 +445,8 @@ bool sendSms( String num, char* msg){
   SIM800L.write(26);
   delay(2000);
   _buffer[0] = NULL;
-  _readSerial_timeout(60000).toCharArray(_buffer, sizeof(_buffer));
+  //_readSerial_timeout(60000).toCharArray(_buffer, sizeof(_buffer));
+  _readSerial(SIM800L, 60000);
   
   #if SERIAL_DEBUG
   Serial.println(_buffer);

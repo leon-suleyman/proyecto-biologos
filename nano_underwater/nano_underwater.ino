@@ -54,7 +54,7 @@ DallasTemperature sensor(&oneWireBus);
 
 SoftwareSerial nano_sim(PIN_RX_SIM, PIN_TX_SIM);
 char buffer_int[5];
-char lectura_txt[40];
+//char lectura_txt[40];
 
 
 Adafruit_ADS1115 ads;
@@ -65,7 +65,7 @@ RTC_DS3231 rtc;
 
 const uint8_t this_nano_id = 0;                    //ID para el nano con sensores. Habría que cambiar para cada uno.
 
-enum : byte {TOMANDO_DATOS, ENVIAR_DATOS} estado = TOMANDO_DATOS;
+//enum : byte {TOMANDO_DATOS, ENVIAR_DATOS} estado = TOMANDO_DATOS;
 
 void setup()
 {
@@ -93,8 +93,8 @@ void setup()
     pinMode(PIN_INTRPT_NANO_SIM, OUTPUT);
 
     digitalWrite(PIN_LED, LOW);
-    attachInterrupt(digitalPinToInterrupt(PIN_INTRPT_NANO_SIM), interrupcionNano, RISING);
-    //digitalWrite(PIN_INTRPT_NANO_SIM, LOW);
+    //attachInterrupt(digitalPinToInterrupt(PIN_INTRPT_NANO_SIM), interrupcionNano, RISING);
+    digitalWrite(PIN_INTRPT_NANO_SIM, LOW);
 
     Serial.println("Completado");
 
@@ -131,6 +131,7 @@ void setup()
 
 void loop()
 {
+  /*
   switch(estado){
     case TOMANDO_DATOS:
       //primero que nada consigo fecha y hora para usar.
@@ -270,7 +271,8 @@ void loop()
 
     break;
   }
-  /*
+  */
+  
   //primero que nada consigo fecha y hora para usar.
   DateTime now = rtc.now();
 
@@ -363,11 +365,13 @@ void loop()
   }
 
   delay(5000); // 60 segundos (TIEMPO de delay LOOP)
-  */
-  
+  software_Reset();
+
+  /*
   if(estado != ENVIAR_DATOS){
     software_Reset();
   }
+  */
 
 }
 //termina el PP
@@ -380,9 +384,11 @@ asm volatile ("  jmp 0");
 }
 
 //interrupción
+/*
 void interrupcionNano(){
   estado = ENVIAR_DATOS;
 }
+*/
 
 //lee la comunicación serial con el arduino nano con el sim800L
 
