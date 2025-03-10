@@ -93,7 +93,7 @@ void loop() {
       //anulamos el buffer previo
       _buffer[0] = NULL;
       //leo el buffer de la comunicación
-      _readSerial(NANO_UNDER, TIME_OUT_READ_SERIAL);
+      _readSerialUnder();
       //si me llegó algo
       if(_buffer[0] != NULL){
         //guardo los datos y le aviso que llegaron
@@ -125,9 +125,7 @@ void loop() {
       //anulamos el buffer previo
       _buffer[0] = NULL;
       //leo el buffer de la comunicación
-      //_readSerial(NANO_DEEPER).toCharArray(_buffer, sizeof(_buffer));
-      //strcat(_buffer, _readSerial(NANO_DEEPER));
-      _readSerial(NANO_DEEPER, TIME_OUT_READ_SERIAL);
+      _readSerialDeeper();
       //si me llegó algo
       if(_buffer[0] != NULL){
         //guardo los datos y le aviso que llegaron
@@ -192,24 +190,67 @@ void interrupcionDeeper(){
 //lectura serial
 //quiero probar hacer una función sola de serial y simplemente pasarle como parametro el SoftwareSerial
 
-//char* _readSerial(SoftwareSerial sw){
-void _readSerial(SoftwareSerial sw, int timeout){
+void _readSerialUnder(){
   uint64_t timeOld = millis();
 
-  while (!sw.available() && !(millis() > timeOld + timeout))
+  while (!NANO_UNDER.available() && !(millis() > timeOld + TIME_OUT_READ_SERIAL))
   {
       delay(13);
   }
 
   _buffer[0] = NULL;
 
-  while(sw.available())
+  while(NANO_UNDER.available())
   {
-      if (sw.available()>0)
+      if (NANO_UNDER.available()>0)
       { 
         char temp[2];
         temp[1] = NULL;
-        temp[0] = (char) sw.read();
+        temp[0] = (char) NANO_UNDER.read();
+        strcat(_buffer, temp);
+      }
+  }
+}
+
+void _readSerialDeeper(){
+  uint64_t timeOld = millis();
+
+  while (!NANO_DEEPER.available() && !(millis() > timeOld + TIME_OUT_READ_SERIAL))
+  {
+      delay(13);
+  }
+
+  _buffer[0] = NULL;
+
+  while(NANO_DEEPER.available())
+  {
+      if (NANO_DEEPER.available()>0)
+      { 
+        char temp[2];
+        temp[1] = NULL;
+        temp[0] = (char) NANO_DEEPER.read();
+        strcat(_buffer, temp);
+      }
+  }
+}
+
+void _readSerialSim(int timeout){
+  uint64_t timeOld = millis();
+
+  while (!SIM800L.available() && !(millis() > timeOld + timeout))
+  {
+      delay(13);
+  }
+
+  _buffer[0] = NULL;
+
+  while(SIM800L.available())
+  {
+      if (SIM800L.available()>0)
+      { 
+        char temp[2];
+        temp[1] = NULL;
+        temp[0] = (char) SIM800L.read();
         strcat(_buffer, temp);
       }
   }
@@ -264,32 +305,24 @@ bool sendSms( String num, String msg){
   SIM800L.println("\r\n"); //limpiar antes de mandar cosas
   SIM800L.println ("AT+CMGF=1"); 	//set sms to text mode
   delay(100);
-  //_buffer=_readSerial();
 
   SIM800L.println ("AT+CMGS=\"" + num + "\"");  	// command to send sms
   //SIM800L.print (num);
   //SIM800L.println("\"");
   delay(100);
-  //_buffer=_readSerial();
   
   SIM800L.print (msg);
-  //SIM800L.print ("\r");
   delay(100);
-  //_buffer=_readSerial();
   
   SIM800L.write(26);
   delay(2000);
   _buffer[0] = NULL;
-  //strcat(_buffer, _readSerial_timeout(60000));
-  //_readSerial_timeout(60000).toCharArray(_buffer, sizeof(_buffer));
-  //_buffer = _readSerial_timeout(60000);
-  _readSerial(SIM800L, 60000);
+  _readSerialSim(60000);
   
   #if SERIAL_DEBUG
   Serial.println(_buffer);
   #endif
-  
-  // Serial.println(_buffer);
+
   //expect CMGS:xxx   , where xxx is a number,for the sending sms.
   if ((strstr(_buffer,"ER")) != NULL) {
       return true;
@@ -328,8 +361,7 @@ bool sendSms( String num, char* msg){
   SIM800L.write(26);
   delay(2000);
   _buffer[0] = NULL;
-  //_readSerial_timeout(60000).toCharArray(_buffer, sizeof(_buffer));
-  _readSerial(SIM800L, 60000);
+  _readSerialSim(60000);
   
   #if SERIAL_DEBUG
   Serial.println(_buffer);

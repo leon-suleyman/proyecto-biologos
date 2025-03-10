@@ -7,7 +7,7 @@
 
 // pines:
 // D2: Dallas DS18b20
-// D3: pin para recibir interrupción del nano con la SIM800L
+// D3: pin para mandar interrupción al nano con la SIM800L
 // D4: SDA  
 // D5: SCL   I2c para 2 chips: ADS1115: Addr= 0x48  y tambien RTC: DS3231: ADDR= 0x68
 // D6: Led Fluor
@@ -28,11 +28,10 @@
 #include <RTClib.h>   // incluye libreria para el manejo del modulo RTC DS3231
 #include <SoftwareSerial.h>
 
-#include <SPI.h>
-#include <SdFat.h>
-//#include "SdFat.h"
-SdFat SD;
-File datos_actuales;
+//#include <SPI.h>
+//#include <SdFat.h>
+//SdFat SD;
+//File datos_actuales;
 
 
 const uint8_t oneWirePin = 2; //sensor dallas
@@ -98,6 +97,7 @@ void setup()
 
     Serial.println("Completado");
 
+    /*
     //inicialización de la tarejta SD
     Serial.print("Initializing SD card...");
 
@@ -106,6 +106,7 @@ void setup()
       return;
     }
     Serial.println("initialization done.");
+    */
  
   }
 
@@ -333,6 +334,7 @@ void loop()
 
   digitalWrite(PIN_INTRPT_NANO_SIM, LOW);
 
+  /*
   //anotamos en la tarjeta SD la lectura
   char filename[22];
   filename[0] = NULL;
@@ -363,6 +365,7 @@ void loop()
     // if the file didn't open, print an error:
     Serial.println("error opening file");
   }
+  */
 
   delay(5000); // 60 segundos (TIEMPO de delay LOOP)
   software_Reset();
