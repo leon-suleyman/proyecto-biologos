@@ -131,149 +131,7 @@ void setup()
 
 
 void loop()
-{
-  /*
-  switch(estado){
-    case TOMANDO_DATOS:
-      //primero que nada consigo fecha y hora para usar.
-      DateTime now = rtc.now();
-
-      digitalWrite(PIN_LED, HIGH);
-      //delay(120000); //2 min para el led
-
-    // lee Fluorescencia
-      int16_t fluoro = readSensorFluoro();
-
-    // lee irradiancia
-      int16_t irradiancia = readSensorIrradiancia();
-
-    // lee temperatura:
-      int16_t temperatura = readSensorTemperatura();
-
-      digitalWrite(PIN_LED, LOW);
-      //mando interrupción al nano SIM para que me escuche los datos que mando;
-      digitalWrite(PIN_INTRPT_NANO_SIM, HIGH);
-      bool recibido = false;
-      int timeOld = millis();
-      lectura_txt[0] = NULL;
-      
-      //armo el string que voy a pasarle al nano_sim
-      strcat(lectura_txt, intToCString(this_nano_id));
-      strcat(lectura_txt, ";" );
-      strcat(lectura_txt, intToCString(now.year()) );
-      strcat(lectura_txt, "/" );
-      strcat(lectura_txt, intToCString(now.month()) );
-      strcat(lectura_txt, "/" );
-      strcat(lectura_txt, intToCString(now.day()) );
-      strcat(lectura_txt, " " );
-      strcat(lectura_txt, intToCString(now.hour()) );
-      strcat(lectura_txt, ":" );
-      strcat(lectura_txt, intToCString(now.minute()) );
-      strcat(lectura_txt, ":" );
-      strcat(lectura_txt, intToCString(now.second()) );
-      strcat(lectura_txt, ";" );
-      strcat(lectura_txt, intToCString(fluoro) );
-      strcat(lectura_txt, ";" );
-      strcat(lectura_txt, intToCString(irradiancia) );
-      strcat(lectura_txt, ";" );
-      strcat(lectura_txt, intToCString(temperatura) );
-      strcat(lectura_txt, "\n" );
-      
-      Serial.print(lectura_txt);
-
-      digitalWrite(PIN_INTRPT_NANO_SIM, LOW);
-
-      //anotamos en la tarjeta SD la lectura
-      char filename[22];
-      filename[0] = NULL;
-      strcat(filename, "data_");
-      strcat(filename, intToCString(now.year()));
-      strcat(filename, "_");
-      strcat(filename, intToCString(now.month()));
-      strcat(filename, "_");
-      strcat(filename, intToCString(now.day()));
-      strcat(filename, ".csv");
-
-      bool no_existe_previamente = true;
-      if(SD.exists(filename)){
-        no_existe_previamente = false;
-      }
-
-      datos_actuales = SD.open(filename, FILE_WRITE);
-      if (datos_actuales) {
-        Serial.print("Writing data...");
-        if(no_existe_previamente){
-          datos_actuales.println("ID;DateTime;fluoro;irradiancia;temperatura");
-        }
-        datos_actuales.print(lectura_txt);
-        // close the file:
-        datos_actuales.close();
-        Serial.println("done.");
-      } else {
-        // if the file didn't open, print an error:
-        Serial.println("error opening file");
-      }
-
-      //escribo en el archivo con todos los datos que no se enviaron al nano sim todavía
-      datos_actuales = SD.open("latest_data.csv", FILE_WRITE);
-      if (datos_actuales) {
-        Serial.print("Writing data...");
-        datos_actuales.print(lectura_txt);
-        // close the file:
-        datos_actuales.close();
-        Serial.println("done.");
-      } else {
-        // if the file didn't open, print an error:
-        Serial.println("error opening file: latest_data.csv");
-      }
-
-      delay(5000); // 60 segundos (TIEMPO de delay LOOP)
-    break;
-
-    case ENVIAR_DATOS:
-      lectura_txt[0] = NULL;
-
-      if(SD.exists("latest_data.csv")){
-        datos_actuales = SD.open("latest_data.csv");
-        if (datos_actuales) {
-          Serial.print("Reading data...");
-          while(datos_actuales.available()){
-            char temp[2];
-            char c = (char) nano_sim.read();
-            temp[1] = NULL;
-            temp[0] = c;
-
-            strcat(lectura_txt, temp);
-
-            if(c == '\n'){
-              nano_sim.print(lectura_txt);
-              delay(100);
-              int timeOld = millis();
-              //esperamos que nos responda que llegó el nano SIM
-              while(_readSerialSIM() != "llegó" && (millis() > timeOld + 5000)){
-                nano_sim.print(lectura_txt);
-              }
-
-              lectura_txt[0] = NULL;
-            }
-          }
-
-          datos_actuales.close();
-          //eliminamos el archivo para no enviar de nuevo esta info por mensaje
-          SD.remove("latest_data.csv");
-          Serial.println("done.");
-        } else {
-          // if the file didn't open, print an error:
-          Serial.println("error opening file");
-        }
-      }
-      //vuelvo a tomar datos normalmente
-      estado = TOMANDO_DATOS;
-
-    break;
-  }
-  */
-  
+{ 
   //primero que nada consigo fecha y hora para usar.
   DateTime now = rtc.now();
 
@@ -319,19 +177,7 @@ void loop()
 
   //mando interrupción al nano SIM para que me escuche los datos que mando;
   digitalWrite(PIN_INTRPT_NANO_SIM, HIGH);
-
-  /*
-  while(!recibido && (millis() <= timeOld + 5000)){
-    //se lo paso por software serial
-    nano_sim.print(lectura_txt);
-    delay(100);
-    if(_readSerialSIM() == "llegó"){
-      recibido = true;
-    }else{
-      delay(500);
-    }
-  }
-  */
+  //le pasamos los datos al Nano de la Superficie
   nano_sim.print(lectura_txt);
 
   Serial.print(lectura_txt);
@@ -371,14 +217,10 @@ void loop()
   }
   
 
-  delay(5000); // 60 segundos (TIEMPO de delay LOOP)
+  delay(5000); // 5 segundos (TIEMPO de delay LOOP)
+  //reseteamos el sistema, ya que si no nos quedamos sin memoria
   software_Reset();
 
-  /*
-  if(estado != ENVIAR_DATOS){
-    software_Reset();
-  }
-  */
 
 }
 //termina el PP
@@ -390,12 +232,7 @@ void software_Reset() // Restarts program from beginning but does not reset the 
 asm volatile ("  jmp 0");  
 }
 
-//interrupción
-/*
-void interrupcionNano(){
-  estado = ENVIAR_DATOS;
-}
-*/
+//inte
 
 //lee la comunicación serial con el arduino nano con el sim800L
 
@@ -427,6 +264,7 @@ char* _readSerialSIM(){
 }
 
 //aux
+//traduce un int a un char* para poder imprimirlo facílmente
 char* intToCString(int x){
   buffer_int[0] = NULL;
   char buff_buffer[5];
