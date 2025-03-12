@@ -28,10 +28,10 @@
 #include <RTClib.h>   // incluye libreria para el manejo del modulo RTC DS3231
 #include <SoftwareSerial.h>
 
-//#include <SPI.h>
-//#include <SdFat.h>
-//SdFat SD;
-//File datos_actuales;
+#include <SPI.h>
+#include <SdFat.h>
+SdFat SD;
+File datos_actuales;
 
 
 const uint8_t oneWirePin = 2; //sensor dallas
@@ -97,7 +97,7 @@ void setup()
 
     Serial.println("Completado");
 
-    /*
+    
     //inicialización de la tarejta SD
     Serial.print("Initializing SD card...");
 
@@ -106,7 +106,7 @@ void setup()
       return;
     }
     Serial.println("initialization done.");
-    */
+    
  
   }
 
@@ -290,8 +290,6 @@ void loop()
   int16_t temperatura = readSensorTemperatura();
 
   digitalWrite(PIN_LED, LOW);
-  //mando interrupción al nano SIM para que me escuche los datos que mando;
-  digitalWrite(PIN_INTRPT_NANO_SIM, HIGH);
   bool recibido = false;
   int timeOld = millis();
   char lectura_txt[40];
@@ -319,6 +317,10 @@ void loop()
   strcat(lectura_txt, intToCString(temperatura) );
   strcat(lectura_txt, "\n" );
 
+  //mando interrupción al nano SIM para que me escuche los datos que mando;
+  digitalWrite(PIN_INTRPT_NANO_SIM, HIGH);
+
+  /*
   while(!recibido && (millis() <= timeOld + 5000)){
     //se lo paso por software serial
     nano_sim.print(lectura_txt);
@@ -329,12 +331,14 @@ void loop()
       delay(500);
     }
   }
-  
+  */
+  nano_sim.print(lectura_txt);
+
   Serial.print(lectura_txt);
 
   digitalWrite(PIN_INTRPT_NANO_SIM, LOW);
 
-  /*
+  
   //anotamos en la tarjeta SD la lectura
   char filename[22];
   filename[0] = NULL;
@@ -365,7 +369,7 @@ void loop()
     // if the file didn't open, print an error:
     Serial.println("error opening file");
   }
-  */
+  
 
   delay(5000); // 60 segundos (TIEMPO de delay LOOP)
   software_Reset();
@@ -405,13 +409,13 @@ char* _readSerialSIM(){
 
   char str[64];
   str[0] = NULL;
+  char temp[2];
 
   while(nano_sim.available())
   {
       if (nano_sim.available()>0)
       {
           //str += (char) nano_sim.read();
-          char temp[2];
           temp[1] = NULL;
           temp[0] = (char) nano_sim.read();
 

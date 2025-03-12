@@ -86,6 +86,7 @@ void loop() {
       if(indice_lecturas >= 24){
         //estado = SEND_SMS;
       }
+    
     break;
 
     case UNDER_READ:
@@ -98,8 +99,8 @@ void loop() {
       if(_buffer[0] != NULL){
         //guardo los datos y le aviso que llegaron
         strcat(lecturas_nanos_sumergidos, _buffer);
-        indice_lecturas_under++;
-        NANO_UNDER.print("llegó");
+        indice_lecturas++;
+        //NANO_UNDER.print("llegó");
         //imprimo en pantalla si estamos en modo debug
         #if (SERIAL_DEBUG)
         Serial.print(lecturas_nanos_sumergidos);
@@ -115,6 +116,7 @@ void loop() {
         #if (SERIAL_DEBUG)
         Serial.println("hubo lectura paralela al leer el under");
         #endif
+        NANO_DEEPER.listen();
         estado = DEEPER_READ;
         request_lectura_paralela = false;
       }
@@ -130,8 +132,8 @@ void loop() {
       if(_buffer[0] != NULL){
         //guardo los datos y le aviso que llegaron
         strcat(lecturas_nanos_sumergidos, _buffer);
-        indice_lecturas_deeper++;
-        NANO_DEEPER.print("llegó");
+        indice_lecturas++;
+        //NANO_DEEPER.print("llegó");
         //imprimo en pantalla si estamos en modo debug
         #if (SERIAL_DEBUG)
         Serial.print(lecturas_nanos_sumergidos);
@@ -147,6 +149,7 @@ void loop() {
         #if (SERIAL_DEBUG)
         Serial.println("hubo lectura paralela al leer el deeper");
         #endif
+        NANO_UNDER.listen();
         estado = UNDER_READ;
         request_lectura_paralela = false;
       }
@@ -168,12 +171,15 @@ void loop() {
     break;
     
   }
+  delay(100);
 }
 
 //Interrupciones
 //agregar mutex ?
 void interrupcionUnder(){
   if(estado == IDLE){
+    //la función listen() nos deja utilizar este puerto para recibir información
+    NANO_UNDER.listen();
     estado = UNDER_READ;
   }else if(estado != UNDER_READ){
     request_lectura_paralela = true;
@@ -181,6 +187,8 @@ void interrupcionUnder(){
 }
 void interrupcionDeeper(){
   if(estado == IDLE){
+    //la función listen() nos deja utilizar este puerto para recibir información
+    NANO_DEEPER.listen();
     estado = DEEPER_READ;
   }else if(estado != DEEPER_READ){
     request_lectura_paralela = true;
@@ -199,12 +207,12 @@ void _readSerialUnder(){
   }
 
   _buffer[0] = NULL;
+  char temp[2];
 
   while(NANO_UNDER.available())
   {
       if (NANO_UNDER.available()>0)
       { 
-        char temp[2];
         temp[1] = NULL;
         temp[0] = (char) NANO_UNDER.read();
         strcat(_buffer, temp);
@@ -221,12 +229,12 @@ void _readSerialDeeper(){
   }
 
   _buffer[0] = NULL;
+  char temp[2];
 
   while(NANO_DEEPER.available())
   {
       if (NANO_DEEPER.available()>0)
       { 
-        char temp[2];
         temp[1] = NULL;
         temp[0] = (char) NANO_DEEPER.read();
         strcat(_buffer, temp);
@@ -243,12 +251,12 @@ void _readSerialSim(int timeout){
   }
 
   _buffer[0] = NULL;
+  char temp[2];
 
   while(SIM800L.available())
   {
       if (SIM800L.available()>0)
       { 
-        char temp[2];
         temp[1] = NULL;
         temp[0] = (char) SIM800L.read();
         strcat(_buffer, temp);
