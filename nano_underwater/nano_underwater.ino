@@ -21,14 +21,17 @@
 //AD2 es el BPW34 turbidez (OBS: no hay conexión para este en la placa que armamos con Leo)
 
 
-#include <SPI.h>              // Include SPI library (needed for the SD card)
 #include <OneWire.h>               // Incluir promagra OneWire lectura
 #include <DallasTemperature.h>   // Incluir programa DallaTemperature lectura
 #include <Adafruit_ADS1X15.h>  // incluye libreria conversor ADS1115
 #include <Wire.h>   // incluye libreria para lector temperatura DS18B20
 #include <RTClib.h>   // incluye libreria para el manejo del modulo RTC DS3231
-#include <SPI.h>
 #include <SoftwareSerial.h>
+
+#include <SPI.h>
+#include <SdFat.h>
+SdFat SD;
+File datos_actuales;
 
 
 const uint8_t oneWirePin = 2; //sensor dallas
@@ -41,13 +44,16 @@ DallasTemperature sensor(&oneWireBus);
 
 
 
-const uint8_t pinDatosDQ = 2;                         // Pin donde se conecta el bus l-wire
-const uint8_t pinLed = 6; //led fluo
-const uint8_t pin_interrupt_nano_sim = 3;
-const uint8_t pin_rx_sim = 7;
-const uint8_t pin_tx_sim = 9;
+#define PIN_DATOS_DQ 2                          // Pin donde se conecta el bus l-wire
+#define PIN_LED 6                               //led fluo
+#define PIN_INTRPT_NANO_SIM 3                   //pin por donde se manda la interrupción al arduino nano que tiene la SIM800L
+#define PIN_RX_SIM 7                            //pin de RX con el arduino sim
+#define PIN_TX_SIM 9                            //pin de TX con el arduino sim
 
-SoftwareSerial nano_sim(pin_rx_sim, pin_tx_sim);
+
+SoftwareSerial nano_sim(PIN_RX_SIM, PIN_TX_SIM);
+char buffer_int[5];
+//char lectura_txt[40];
 
 
 Adafruit_ADS1115 ads;
@@ -56,6 +62,9 @@ const float multiplier = 0.1875F;
 // RTC_DS1307 rtc;
 RTC_DS3231 rtc;
 
+const uint8_t this_nano_id = 0;                    //ID para el nano con sensores. Habría que cambiar para cada uno.
+
+//enum : byte {TOMANDO_DATOS, ENVIAR_DATOS} estado = TOMANDO_DATOS;
 
 void setup()
 {
@@ -75,24 +84,34 @@ void setup()
   
   
     ads.begin(); //ads1115
-    Serial.println("abro comunicación con el sistema de telecomunicación");
+
     nano_sim.begin(9600);
     //nano_sim.println("Buen día!");
 
-    Serial.begin("Iniciando Led para fluorecencia");
-    pinMode(pinLed, OUTPUT); // pin LED en output fluorom
-    pinMode(pin_interrupt_nano_sim, OUTPUT);
+    pinMode(PIN_LED, OUTPUT); // pin LED en output fluorom
+    pinMode(PIN_INTRPT_NANO_SIM, OUTPUT);
 
-    digitalWrite(6, LOW);
-    digitalWrite(pin_interrupt_nano_sim, LOW);
+    digitalWrite(PIN_LED, LOW);
+    //attachInterrupt(digitalPinToInterrupt(PIN_INTRPT_NANO_SIM), interrupcionNano, RISING);
+    digitalWrite(PIN_INTRPT_NANO_SIM, LOW);
 
     Serial.println("Completado");
+
+    
+    //inicialización de la tarejta SD
+    Serial.print("Initializing SD card...");
+
+    if (!SD.begin(SSpin)) {
+      Serial.println("initialization failed!");
+      return;
+    }
+    Serial.println("initialization done.");
+    
  
   }
 
   //dde aca inicia el RTC:
   {
-    Serial.println("Iniciando RTC");
     if (!rtc.begin()) {
       Serial.println(F("No encuentro al RTC: Verificar conexiones y bateria"));
       while (1);
@@ -107,53 +126,99 @@ void setup()
       // Fijar a fecha y hora específica. En el ejemplo, 21 de Enero de 2016 a las 03:00:00
       // rtc.adjust(DateTime(2016, 1, 21, 3, 0, 0));
     }
-    Serial.println("RTC iniciado");
-    
   }
 }   //termina el setup
 
 
 void loop()
-{
+{ 
   //primero que nada consigo fecha y hora para usar.
   DateTime now = rtc.now();
 
-  digitalWrite(6, HIGH);
+  digitalWrite(PIN_LED, HIGH);
   //delay(120000); //2 min para el led
 
 // lee Fluorescencia
-  int fluoro = readSensorFluoro();
+  int16_t fluoro = readSensorFluoro();
 
 // lee irradiancia
-  int irradiancia = readSensorIrradiancia();
+  int16_t irradiancia = readSensorIrradiancia();
 
 // lee temperatura:
-  int temperatura = readSensorTemperatura();
+  int16_t temperatura = readSensorTemperatura();
 
-  digitalWrite(6, LOW);
-  //mando interrupción al nano SIM para que me escuche los datos que mando;
-  digitalWrite(pin_interrupt_nano_sim, HIGH);
+  digitalWrite(PIN_LED, LOW);
   bool recibido = false;
   int timeOld = millis();
-  while(!recibido && (millis() <= timeOld + 5000)){
-    //armo el string que voy a pasarle al nano_sim
-    String lectura_txt = "";
-    lectura_txt = lectura_txt + String(now.year()) + "/" + String(now.month()) + "/" + String(now.day()) + " " + String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second()) + ";";
-    lectura_txt = lectura_txt + String(fluoro) + ";" + String(irradiancia) + ";" + String(temperatura);
-    lectura_txt = lectura_txt + "\n";
-    //se lo paso por software serial
-    nano_sim.print(lectura_txt);
-    delay(100);
-    if(_readSerialSIM() == "llegó"){
-      recibido = true;
+  char lectura_txt[40];
+  lectura_txt[0] = NULL;
+  
+  //armo el string que voy a pasarle al nano_sim
+  strcat(lectura_txt, intToCString(this_nano_id));
+  strcat(lectura_txt, ";" );
+  strcat(lectura_txt, intToCString(now.year()) );
+  strcat(lectura_txt, "/" );
+  strcat(lectura_txt, intToCString(now.month()) );
+  strcat(lectura_txt, "/" );
+  strcat(lectura_txt, intToCString(now.day()) );
+  strcat(lectura_txt, " " );
+  strcat(lectura_txt, intToCString(now.hour()) );
+  strcat(lectura_txt, ":" );
+  strcat(lectura_txt, intToCString(now.minute()) );
+  strcat(lectura_txt, ":" );
+  strcat(lectura_txt, intToCString(now.second()) );
+  strcat(lectura_txt, ";" );
+  strcat(lectura_txt, intToCString(fluoro) );
+  strcat(lectura_txt, ";" );
+  strcat(lectura_txt, intToCString(irradiancia) );
+  strcat(lectura_txt, ";" );
+  strcat(lectura_txt, intToCString(temperatura) );
+  strcat(lectura_txt, "\n" );
+
+  //mando interrupción al nano SIM para que me escuche los datos que mando;
+  digitalWrite(PIN_INTRPT_NANO_SIM, HIGH);
+  //le pasamos los datos al Nano de la Superficie
+  nano_sim.print(lectura_txt);
+
+  Serial.print(lectura_txt);
+
+  digitalWrite(PIN_INTRPT_NANO_SIM, LOW);
+
+  
+  //anotamos en la tarjeta SD la lectura
+  char filename[22];
+  filename[0] = NULL;
+  strcat(filename, "data_");
+  strcat(filename, intToCString(now.year()));
+  strcat(filename, "_");
+  strcat(filename, intToCString(now.month()));
+  strcat(filename, "_");
+  strcat(filename, intToCString(now.day()));
+  strcat(filename, ".csv");
+
+  bool no_existe_previamente = true;
+  if(SD.exists(filename)){
+    no_existe_previamente = false;
+  }
+
+  datos_actuales = SD.open(filename, FILE_WRITE);
+  if (datos_actuales) {
+    Serial.print("Writing data...");
+    if(no_existe_previamente){
+      datos_actuales.println("ID;DateTime;fluoro;irradiancia;temperatura");
     }
-
-  digitalWrite(pin_interrupt_nano_sim, LOW);
-
+    datos_actuales.print(lectura_txt);
+    // close the file:
+    datos_actuales.close();
+    Serial.println("done.");
+  } else {
+    // if the file didn't open, print an error:
+    Serial.println("error opening file");
   }
   
-  delay(3000); // 60 segundos (TIEMPO de delay LOOP)
 
+  delay(5000); // 5 segundos (TIEMPO de delay LOOP)
+  //reseteamos el sistema, ya que si no nos quedamos sin memoria
   software_Reset();
 
 
@@ -167,8 +232,11 @@ void software_Reset() // Restarts program from beginning but does not reset the 
 asm volatile ("  jmp 0");  
 }
 
+//inte
+
 //lee la comunicación serial con el arduino nano con el sim800L
-String _readSerialSIM(){
+
+char* _readSerialSIM(){
   uint64_t timeOld = millis();
 
   while (!nano_sim.available() && !(millis() > timeOld + 5000))
@@ -176,17 +244,39 @@ String _readSerialSIM(){
       delay(13);
   }
 
-  String str;
+  char str[64];
+  str[0] = NULL;
+  char temp[2];
 
   while(nano_sim.available())
   {
       if (nano_sim.available()>0)
       {
-          str += (char) nano_sim.read();
+          //str += (char) nano_sim.read();
+          temp[1] = NULL;
+          temp[0] = (char) nano_sim.read();
+
+          strcat(str, temp);
       }
   }
 
   return str;
+}
+
+//aux
+//traduce un int a un char* para poder imprimirlo facílmente
+char* intToCString(int x){
+  buffer_int[0] = NULL;
+  char buff_buffer[5];
+  buff_buffer[0] = NULL;
+  if(x < 0){
+    strcat(buff_buffer, "-");
+  }
+
+  itoa(x, buff_buffer, 10);
+
+  strcat(buffer_int, buff_buffer);
+  return buffer_int;
 }
 
 // Funcion sensores
@@ -245,3 +335,5 @@ int readSensorFluoro()
   return sval0;
  
 }
+
+
