@@ -46,10 +46,12 @@ SoftwareSerial NANO_DEEPER(RX_NANO_DEEPER_PIN, TX_NANO_DEEPER_PIN);
 char _buffer[40];
 
 //buffer donde guardamos las lecturas que llegan de los Nanos sumergidos
-char lecturas_nanos_sumergidos[912];
+//char lecturas_nanos_sumergidos[912];
+char lecturas_nano_under[469];
+char lecturas_nano_deeper[469];
 
 //cuantas lecturas tenemos guardadas
-uint8_t indice_lecturas = 0;
+//uint8_t indice_lecturas = 0;
 uint8_t indice_lecturas_deeper = 0;
 uint8_t indice_lecturas_under = 0;
 
@@ -97,7 +99,7 @@ void loop() {
     //si estamos en IDLE, no hace nada, pero si nota que tenemos 24 lecturas guardadas, se pone para mandar el mensaje
     case IDLE:
       //if(indice_lecturas >= 24){
-      if(indice_lecturas_under == 12 && indice_lecturas_deeper == 12){
+      if(indice_lecturas_under == 12 || indice_lecturas_deeper == 12){
         //ponemos la SIM800L en consumo normal para mandar mensajes
         //putSIM800LToNormal();
         SIM800L.listen();
@@ -116,11 +118,12 @@ void loop() {
       //si me llegó algo
       if(_buffer[0] != NULL){
         //guardo los datos
-        strcat(lecturas_nanos_sumergidos, _buffer);
+        strcat(lecturas_nano_under, _buffer);
         indice_lecturas_under++;
         //imprimo en pantalla si estamos en modo debug
         #if (SERIAL_DEBUG)
-        Serial.print(lecturas_nanos_sumergidos);
+        Serial.print(lecturas_nano_under);
+        Serial.print(lecturas_nano_deeper);
         Serial.println(indice_lecturas_under);
         #endif
       }else{
@@ -134,7 +137,6 @@ void loop() {
       if(request_lectura_paralela){
         #if (SERIAL_DEBUG)
         Serial.println("hubo lectura paralela al leer el under");
-        Serial.println(indice_lecturas_deeper);
         #endif
         //cambio a hacer la lectura del Nano Deeper
         NANO_DEEPER.listen();
@@ -153,11 +155,13 @@ void loop() {
       //si me llegó algo
       if(_buffer[0] != NULL){
         //guardo los datos
-        strcat(lecturas_nanos_sumergidos, _buffer);
+        strcat(lecturas_nano_deeper, _buffer);
         indice_lecturas_deeper++;
         //imprimo en pantalla si estamos en modo debug
         #if (SERIAL_DEBUG)
-        Serial.print(lecturas_nanos_sumergidos);
+        Serial.print(lecturas_nano_under);
+        Serial.print(lecturas_nano_deeper);
+        Serial.println(indice_lecturas_deeper);
         #endif
       }else{
         #if (SERIAL_DEBUG)
@@ -184,13 +188,21 @@ void loop() {
       #if (SERIAL_DEBUG)
       Serial.println("Por enviar datos por SMS");
       #endif
-      sendLongSms(num_tel, lecturas_nanos_sumergidos);
+      //si está lleno el buffer del nano uner, mandamos ese
+      if(indice_lecturas_under >= 12){
+        sendLongSms(num_tel, lecturas_nano_under);
+        lecturas_nano_under[0] = NULL;
+        indice_lecturas_under = 0;
+      }
+      //si está lleno el buffer del nano deeper, mandamos ese
+      if(indice_lecturas_deeper >= 12){
+        sendLongSms(num_tel, lecturas_nano_deeper);
+        lecturas_nano_deeper[0] = NULL;
+        indice_lecturas_deeper = 0;
+      }
       #if (SERIAL_DEBUG)
       Serial.println("Datos enviados por SMS");
       #endif
-      lecturas_nanos_sumergidos[0] = NULL;
-      indice_lecturas_under = 0;
-      indice_lecturas_deeper = 0;
       estado = IDLE;
       //si hubo lectura paralela, mandamos a leer al Nano Under pero sin sacar el flag pq no sabemos cual es, y si no lee nada, igual pasamos a leer al Deeper y ya.
       if(request_lectura_paralela){
